@@ -2,12 +2,7 @@
 
 A Claude Code plugin that keeps Claude's replies in Simplified Technical English.
 
-Claude writes with a set of reflexes. It opens with a warm-up. It reaches for a marketing
-adjective. It narrates the search instead of the finding. It closes with a sign-off that
-carries no information. Every one of those reflexes is a fixed string, so a checker catches
-it and Claude's own judgment does not.
-
-ste-guard is that checker, wired into the reply loop.
+Claude talks too much. This makes it talk less.
 
 ## What it does
 
