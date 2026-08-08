@@ -291,6 +291,43 @@ def lint(profile, raw):
     return hard, soft, prose
 
 
+def verdict(profile, raw):
+    """The one decision every agent target shares. Two implementations would drift."""
+    hard, soft, prose = lint(profile, raw)
+
+    words = word_count(prose)
+    too_short = words < profile.get("min_words_to_lint", 25)
+    threshold = profile.get("soft_block_threshold", 3)
+
+    if too_short:
+        violations = []
+    else:
+        violations = hard + (soft if len(soft) >= threshold or hard else [])
+
+    return {
+        "clean": not violations,
+        "too_short": too_short,
+        "words": words,
+        "profile": profile.get("name"),
+        "hard": hard,
+        "soft": soft,
+        "violations": violations,
+        "max_blocks_per_chain": profile.get("max_blocks_per_chain", 2),
+    }
+
+
+def rewrite_prompt(violations, limit=8):
+    """The correction text. Every target sends the same wording, so behaviour matches."""
+    listed = "\n".join(f"  - {item}" for item in violations[:limit])
+
+    return (
+        "STE lint failed on your last message. Rewrite it, then stop.\n"
+        "Keep the same content and the same conclusions. Fix only the prose.\n\n"
+        f"{listed}\n\n"
+        "Do not explain the rewrite. Just send the clean version."
+    )
+
+
 # ---------------------------------------------------------------- state
 
 

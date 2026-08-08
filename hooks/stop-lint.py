@@ -86,16 +86,14 @@ def main():
     if not message.strip():
         clear_chain_and_allow()
 
-    hard, soft, prose = ste_rules.lint(profile, message)
-
-    if ste_rules.word_count(prose) < profile.get("min_words_to_lint", 25):
-        clear_chain_and_allow()
-
-    threshold = profile.get("soft_block_threshold", 3)
-    violations = hard + (soft if len(soft) >= threshold or hard else [])
+    result = ste_rules.verdict(profile, message)
+    violations = result["violations"]
 
     if os.environ.get("STE_GUARD_DEBUG"):
-        print(f"ste-guard: {len(hard)} hard, {len(soft)} soft", file=sys.stderr)
+        print(
+            f"ste-guard: {len(result['hard'])} hard, {len(result['soft'])} soft",
+            file=sys.stderr,
+        )
 
     if not violations:
         clear_chain_and_allow()
@@ -122,15 +120,7 @@ def main():
     if blocks > per_message:
         allow()
 
-    listed = "\n".join(f"  - {item}" for item in violations[:8])
-    reason = (
-        "STE lint failed on your last message. Rewrite it, then stop.\n"
-        "Keep the same content and the same conclusions. Fix only the prose.\n\n"
-        f"{listed}\n\n"
-        "Do not explain the rewrite. Just send the clean version."
-    )
-
-    print(json.dumps({"decision": "block", "reason": reason}))
+    print(json.dumps({"decision": "block", "reason": ste_rules.rewrite_prompt(violations)}))
     sys.exit(0)
 
 

@@ -1,0 +1,56 @@
+{
+  "name": "ste-guard",
+  "version": "0.3.0",
+  "description": "Keeps agent replies in Simplified Technical English. Ships for pi, Claude Code, and Codex from one rule engine.",
+  "keywords": [
+    "pi-package",
+    "writing",
+    "style",
+    "ste",
+    "asd-ste100",
+    "linter",
+    "anti-slop"
+  ],
+  "license": "MIT",
+  "author": "Owen Carpenter",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ofrusch/ste-guard.git"
+  },
+  "homepage": "https://github.com/ofrusch/ste-guard#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "pi": {
+    "extensions": ["./extensions"],
+    "skills": ["./skills"]
+  },
+  "files": [
+    "extensions/",
+    "skills/",
+    "hooks/",
+    "profiles/",
+    "scripts/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-agent-core": { "optional": true },
+    "@earendil-works/pi-ai": { "optional": true },
+    "@earendil-works/pi-coding-agent": { "optional": true },
+    "@earendil-works/pi-tui": { "optional": true },
+    "typebox": { "optional": true }
+  },
+  "scripts": {
+    "test": "python3 -m unittest discover -s tests -v"
+  }
+}

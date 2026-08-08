@@ -1,13 +1,20 @@
 {
   "name": "ste-guard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Keeps Codex replies in Simplified Technical English. A Stop hook checks each reply and returns the violations so Codex rewrites it.",
   "author": {
     "name": "Owen Carpenter"
   },
   "repository": "https://github.com/ofrusch/ste-guard",
   "license": "MIT",
-  "keywords": ["writing", "style", "ste", "asd-ste100", "linter", "anti-slop"],
+  "keywords": [
+    "writing",
+    "style",
+    "ste",
+    "asd-ste100",
+    "linter",
+    "anti-slop"
+  ],
   "skills": "./skills/",
   "hooks": "./hooks/codex-hooks.json",
   "interface": {
@@ -16,7 +23,9 @@
     "longDescription": "Checks every reply against a configurable Simplified Technical English profile. When a rule fails, the Stop hook returns the violations and Codex writes the clean version. Profiles control the word ceiling, the rule switches, and the banned phrase lists.",
     "developerName": "Owen Carpenter",
     "category": "Developer Tools",
-    "capabilities": ["Interactive"],
+    "capabilities": [
+      "Interactive"
+    ],
     "defaultPrompt": [
       "Show me the active STE profile and its word ceiling.",
       "Lint this file against the STE rules."

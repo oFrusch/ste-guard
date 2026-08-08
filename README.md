@@ -66,6 +66,25 @@ Remove the entries with `--uninstall`.
   the violations as a new prompt, so the first draft stays in the transcript.
 - The `ste` skill loads from the plugin with no extra step.
 
+## Install for pi
+
+```
+pi install npm:ste-guard
+```
+
+The package carries the extension and the skill. pi loads the TypeScript through jiti, so no
+build step runs. Install from a checkout with `pi install ./ste-guard`, or try it for one
+session with `pi -e ./extensions/ste-guard.ts`.
+
+### What differs on pi
+
+- pi has no block primitive on an assistant message. The extension asks for a rewrite
+  through a follow-up user message instead. The model regenerates, and both the first draft
+  and the correction stay in the transcript.
+- pi streams the reply before the check runs, so you see the first draft appear.
+- The extension holds no rules of its own. It runs the same Python checker the other two
+  agents run.
+
 ## Configuration
 
 ste-guard resolves the active profile in this order:
@@ -154,10 +173,11 @@ Inline code, fenced code, block quotes, links, and file paths are also exempt.
 
 ## Tests
 
-The suite uses the standard library only, so it needs no install step.
+Both suites use only what the runtime ships, so neither needs an install step.
 
 ```
 python3 -m unittest discover -s tests -v
+node --test tests/extension.test.ts
 ```
 
 Four of the tests run the plugin's own documentation through the checker, so the docs cannot

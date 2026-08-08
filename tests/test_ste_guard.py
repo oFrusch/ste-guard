@@ -557,11 +557,44 @@ class CodexManifests(unittest.TestCase):
         self.assertEqual(data["hooks"], "./hooks/codex-hooks.json")
         self.assertIn("displayName", data["interface"])
 
-    def test_both_manifests_declare_the_same_version(self):
+    def test_all_three_manifests_declare_the_same_version(self):
         claude = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())["version"]
         codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text())["version"]
+        pi = json.loads((ROOT / "package.json").read_text())["version"]
 
         self.assertEqual(claude, codex)
+        self.assertEqual(claude, pi)
+
+
+class PiManifest(unittest.TestCase):
+    def setUp(self):
+        self.data = json.loads((ROOT / "package.json").read_text())
+
+    def test_it_declares_the_discovery_keyword(self):
+        self.assertIn("pi-package", self.data["keywords"])
+
+    def test_it_points_at_the_extension_and_the_skill(self):
+        self.assertEqual(self.data["pi"]["extensions"], ["./extensions"])
+        self.assertEqual(self.data["pi"]["skills"], ["./skills"])
+
+    def test_the_pi_core_packages_stay_peer_dependencies(self):
+        peers = self.data["peerDependencies"]
+
+        for name in ("@earendil-works/pi-ai", "@earendil-works/pi-coding-agent", "typebox"):
+            self.assertEqual(peers.get(name), "*", name)
+
+        self.assertNotIn("dependencies", self.data)
+
+    def test_the_published_files_carry_the_engine(self):
+        for path in ("extensions/", "skills/", "hooks/", "profiles/"):
+            self.assertIn(path, self.data["files"])
+
+    def test_the_extension_never_reimplements_a_rule(self):
+        """The rules live in Python. A phrase list in the TypeScript is a drift bug."""
+        source = (ROOT / "extensions" / "ste-guard.ts").read_text()
+
+        for phrase in ("robust", "seamless", "great question", "hope this helps"):
+            self.assertNotIn(phrase, source.lower(), phrase)
 
     def test_the_two_hook_files_declare_the_same_events_and_scripts(self):
         """The files differ only in the path variable. Any other drift is a bug."""

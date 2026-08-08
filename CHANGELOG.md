@@ -5,6 +5,31 @@ All notable changes to ste-guard appear in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-08
+
+### Added
+
+- pi support. `package.json` carries the `pi` key and the `pi-package` keyword, so one npm
+  install brings the extension and the skill. No build step runs, because pi loads the
+  TypeScript through jiti.
+- `extensions/ste-guard.ts`. It hooks `agent_end`, runs the Python checker through
+  `pi.exec`, and calls `pi.sendUserMessage` with `deliverAs: "followUp"` on a failure.
+- `ste_rules.verdict()`, the one decision all three agents share.
+- `ste_rules.rewrite_prompt()`, the one correction wording all three agents send.
+- A `--json` mode on `ste-check`, which prints the verdict for the pi extension.
+- A Node test suite for the extension, run with the built-in test runner.
+
+### Changed
+
+- `stop-lint.py` now calls `verdict()` instead of its own copy of the threshold logic.
+  Behaviour does not change.
+
+### Notes
+
+- pi has no block primitive on an assistant message. The extension therefore asks for a
+  rewrite through a follow-up user message, which matches the Codex behaviour.
+- The rules never move into TypeScript. A test asserts the extension holds no phrase list.
+
 ## [0.2.0] - 2026-08-08
 
 ### Added
@@ -56,6 +81,7 @@ First release.
   the phrase lists, so a cited phrase never counts as a violation.
 - The `STE_GUARD_OFF`, `STE_GUARD_DEBUG`, and `STE_GUARD_PROFILE` environment variables.
 
+[0.3.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.2.0
 [0.1.1]: https://github.com/ofrusch/ste-guard/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.1.0
