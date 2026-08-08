@@ -35,7 +35,7 @@ Set `injection` to `always` when you prefer the predictable cost.
 ## Install
 
 ```
-claude plugin marketplace add owenc343/ste-guard
+claude plugin marketplace add ofrusch/ste-guard
 claude plugin install ste-guard@ste-guard
 ```
 
