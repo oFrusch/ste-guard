@@ -5,6 +5,23 @@ All notable changes to ste-guard appear in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-08-08
+
+### Added
+
+- Codex support. A `.codex-plugin/plugin.json` manifest makes the `ste` skill available in
+  Codex, and `hooks/codex-hooks.json` declares the same three hooks against `${PLUGIN_ROOT}`.
+- `scripts/codex-install.py`, which wires the hooks into `~/.codex/hooks.json` by absolute
+  path. Codex v0.147 installs a plugin's skills but does not load the hooks it ships. The
+  script backs up the file, strips the predecessor entries, and never stacks duplicates.
+
+### Notes
+
+- Codex reads `.claude-plugin/marketplace.json` directly, so one marketplace serves both
+  agents.
+- A Codex `Stop` hook that returns `decision: block` continues the turn with the reason as a
+  new prompt. It does not reject the reply, so the first draft stays in the transcript.
+
 ## [0.1.1] - 2026-08-08
 
 ### Fixed
@@ -39,5 +56,6 @@ First release.
   the phrase lists, so a cited phrase never counts as a violation.
 - The `STE_GUARD_OFF`, `STE_GUARD_DEBUG`, and `STE_GUARD_PROFILE` environment variables.
 
+[0.2.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.2.0
 [0.1.1]: https://github.com/ofrusch/ste-guard/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.1.0

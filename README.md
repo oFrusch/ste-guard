@@ -40,6 +40,32 @@ shorthand and still clone over HTTPS, set `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1`.
 
 Optionally set the output style to `STE` with `/output-style`. The hooks work without it.
 
+## Install for Codex
+
+Codex reads the same marketplace file, so the first two steps match.
+
+```
+codex plugin marketplace add https://github.com/ofrusch/ste-guard.git
+codex plugin add ste-guard@ste-guard
+python3 ~/.codex/plugins/cache/ste-guard/ste-guard/<version>/scripts/codex-install.py
+```
+
+The third step exists because Codex v0.147 installs a plugin's skills but does not load the
+hooks the plugin ships. The script writes the three hook entries into `~/.codex/hooks.json`
+by absolute path. It backs the file up first, it leaves your other hooks alone, and it never
+stacks duplicates. Run it again after a plugin update, because the version sits in the path.
+
+Codex asks you to trust each new hook command on the next interactive run. Until you approve
+them, Codex skips the hooks without a warning. Run `codex` once and accept the three prompts.
+
+Remove the entries with `--uninstall`.
+
+### What differs on Codex
+
+- A Codex `Stop` hook that blocks does not reject the reply. Codex continues the turn with
+  the violations as a new prompt, so the first draft stays in the transcript.
+- The `ste` skill loads from the plugin with no extra step.
+
 ## Configuration
 
 ste-guard resolves the active profile in this order:

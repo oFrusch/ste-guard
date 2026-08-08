@@ -549,5 +549,129 @@ class Manifests(unittest.TestCase):
             self.assertTrue(os.access(HOOKS / name, os.X_OK), name)
 
 
+class CodexManifests(unittest.TestCase):
+    def test_codex_manifest_parses(self):
+        data = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text())
+
+        self.assertEqual(data["name"], "ste-guard")
+        self.assertEqual(data["hooks"], "./hooks/codex-hooks.json")
+        self.assertIn("displayName", data["interface"])
+
+    def test_both_manifests_declare_the_same_version(self):
+        claude = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())["version"]
+        codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text())["version"]
+
+        self.assertEqual(claude, codex)
+
+    def test_the_two_hook_files_declare_the_same_events_and_scripts(self):
+        """The files differ only in the path variable. Any other drift is a bug."""
+        claude = json.loads((HOOKS / "hooks.json").read_text())["hooks"]
+        codex = json.loads((HOOKS / "codex-hooks.json").read_text())["hooks"]
+
+        self.assertEqual(set(claude), set(codex))
+
+        for event in claude:
+            claude_scripts = [
+                h["command"].rsplit("/", 1)[-1] for e in claude[event] for h in e["hooks"]
+            ]
+            codex_scripts = [
+                h["command"].rsplit("/", 1)[-1] for e in codex[event] for h in e["hooks"]
+            ]
+
+            self.assertEqual(claude_scripts, codex_scripts, event)
+
+    def test_each_hook_file_uses_its_own_root_variable(self):
+        claude = (HOOKS / "hooks.json").read_text()
+        codex = (HOOKS / "codex-hooks.json").read_text()
+
+        self.assertIn("${CLAUDE_PLUGIN_ROOT}", claude)
+        self.assertNotIn("${PLUGIN_ROOT}", claude.replace("${CLAUDE_PLUGIN_ROOT}", ""))
+        self.assertIn("${PLUGIN_ROOT}", codex)
+        self.assertNotIn("${CLAUDE_PLUGIN_ROOT}", codex)
+
+
+class CodexInstaller(unittest.TestCase):
+    """The installer edits a real path, so every test points it at a temporary file."""
+
+    def setUp(self):
+        self.home = tempfile.mkdtemp(prefix="ste-guard-codex-")
+        self.hooks = pathlib.Path(self.home) / ".codex" / "hooks.json"
+        self.hooks.parent.mkdir(parents=True)
+
+    def tearDown(self):
+        shutil.rmtree(self.home, ignore_errors=True)
+
+    def run_installer(self, *flags):
+        return subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "codex-install.py"), "--root", str(ROOT), *flags],
+            capture_output=True,
+            text=True,
+            env=dict(os.environ, HOME=self.home),
+        )
+
+    def read(self):
+        return json.loads(self.hooks.read_text())["hooks"]
+
+    def commands(self, events):
+        return [h["command"] for entries in events.values() for e in entries for h in e["hooks"]]
+
+    def test_it_writes_all_three_events(self):
+        self.hooks.write_text(json.dumps({"hooks": {}}))
+        result = self.run_installer()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(set(self.read()), {"SessionStart", "UserPromptSubmit", "Stop"})
+
+    def test_it_preserves_unrelated_hooks(self):
+        other = {"type": "command", "command": "rtk hook claude"}
+        self.hooks.write_text(json.dumps({"hooks": {"PreToolUse": [{"hooks": [other]}]}}))
+        self.run_installer()
+
+        self.assertIn("rtk hook claude", self.commands(self.read()))
+
+    def test_a_second_run_never_stacks_duplicates(self):
+        self.hooks.write_text(json.dumps({"hooks": {}}))
+        self.run_installer()
+        self.run_installer()
+
+        self.assertEqual(len(self.commands(self.read())), 3)
+
+    def test_it_strips_the_predecessor_scripts(self):
+        legacy = {"type": "command", "command": "'/home/me/.codex/hooks/ste-lint.py'"}
+        self.hooks.write_text(json.dumps({"hooks": {"Stop": [{"hooks": [legacy]}]}}))
+        self.run_installer()
+
+        self.assertNotIn(legacy["command"], self.commands(self.read()))
+        self.assertEqual(len(self.commands(self.read())), 3)
+
+    def test_uninstall_removes_only_our_entries(self):
+        other = {"type": "command", "command": "rtk hook claude"}
+        self.hooks.write_text(json.dumps({"hooks": {"PreToolUse": [{"hooks": [other]}]}}))
+        self.run_installer()
+        self.run_installer("--uninstall")
+
+        self.assertEqual(self.commands(self.read()), ["rtk hook claude"])
+
+    def test_it_backs_up_before_it_writes(self):
+        self.hooks.write_text(json.dumps({"hooks": {}}))
+        self.run_installer()
+
+        self.assertTrue(self.hooks.with_suffix(".json.bak").exists())
+
+    def test_it_creates_the_file_when_none_exists(self):
+        self.hooks.unlink(missing_ok=True)
+        result = self.run_installer()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(self.commands(self.read())), 3)
+
+    def test_malformed_json_stops_the_installer(self):
+        self.hooks.write_text("{not json")
+        result = self.run_installer()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("not valid JSON", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
