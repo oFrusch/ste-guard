@@ -122,6 +122,17 @@ Inline code, fenced code, block quotes, links, and file paths are also exempt.
 - The checker matches fixed strings. A model that invents a new filler phrase gets through
   until you add the phrase to a list.
 
+## Tests
+
+The suite uses the standard library only, so it needs no install step.
+
+```
+python3 -m unittest discover -s tests -v
+```
+
+Four of the tests run the plugin's own documentation through the checker, so the docs cannot
+drift out of conformance without a red build.
+
 ## Related work
 
 - [AminBlg/SimpleEnglish](https://github.com/AminBlg/SimpleEnglish) — an STE skill and plugin

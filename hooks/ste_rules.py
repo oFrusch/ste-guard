@@ -14,7 +14,9 @@ PLUGIN_ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUNDLED_PROFILES = PLUGIN_ROOT / "profiles"
 USER_CONFIG = pathlib.Path(os.path.expanduser("~/.claude/ste-guard.json"))
 
-STATE_DIR = pathlib.Path(os.path.expanduser("~/.claude/.ste-guard-state"))
+STATE_DIR = pathlib.Path(
+    os.environ.get("STE_GUARD_STATE_DIR") or os.path.expanduser("~/.claude/.ste-guard-state")
+)
 STATE_TTL_SECONDS = 24 * 60 * 60
 SESSION_KEY_OK = re.compile(r"[^A-Za-z0-9._-]")
 
