@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""Pre-flight linter. Checks a draft before it is sent, with the Stop hook's own rules.
+
+Reads the draft on stdin or from a file argument. Prints violations and exits 1.
+The Stop hook stays the enforcement. This is the pre-flight that keeps it quiet.
+"""
+
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+import ste_rules
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    text = pathlib.Path(args[0]).read_text() if args else sys.stdin.read()
+
+    profile = ste_rules.load_profile()
+    hard, soft, prose = ste_rules.lint(profile, text)
+    hits = hard + soft
+
+    if not hits:
+        print(f"clean — {ste_rules.word_count(prose)} words, profile {profile.get('name')}")
+        return 0
+
+    for hit in hits:
+        print(f"  - {hit}")
+
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

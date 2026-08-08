@@ -1,0 +1,61 @@
+{
+  "name": "default",
+  "description": "ASD-STE100 chat subset plus a generous word ceiling. Grammar, not voice.",
+
+  "injection": "lazy",
+  "min_words_to_lint": 25,
+  "soft_block_threshold": 3,
+  "max_blocks_per_message": 1,
+  "max_blocks_per_chain": 2,
+
+  "budget": {
+    "words": 250,
+    "sentence_words": 25,
+    "uncapped_on_heading": true,
+    "opener_window": 220,
+    "closer_window": 320
+  },
+
+  "rules": {
+    "openers": true,
+    "closers": true,
+    "puffery": true,
+    "not_just": true,
+    "asides": true,
+    "gerund": true,
+    "passive": true,
+    "narration": false,
+    "flourish": false,
+    "prose_wall": false
+  },
+
+  "lists": {
+    "openers": [
+      "great question", "good question", "excellent question", "that's a great",
+      "i'd be happy to", "i would be happy to", "happy to help", "let's dive in",
+      "let me dive in", "certainly!", "sure!", "absolutely!", "of course!",
+      "great catch", "you're absolutely right", "you are absolutely right"
+    ],
+    "closers": [
+      "let me know if", "hope this helps", "hope that helps", "feel free to",
+      "don't hesitate to", "do not hesitate to", "anything else i can",
+      "is there anything else", "happy to clarify", "let me know how"
+    ],
+    "puffery": [
+      "robust", "seamless", "leverage", "leverages", "leveraging", "delve", "delves",
+      "powerful", "elevate", "elevates", "unlock", "unlocks", "game-chang",
+      "cutting-edge", "best-in-class", "state-of-the-art", "supercharge",
+      "streamline", "streamlines", "holistic", "synergy", "utilize", "utilizes"
+    ],
+    "narration": [
+      "it found", "it caught", "it also found", "it turned up", "it settled",
+      "worth naming", "worth noting", "worth flagging", "i discovered", "i found that",
+      "what it found", "it uncovered"
+    ],
+    "flourish": [
+      "here's the thing", "therein lies", "the real question is whether",
+      "and that is the point", "which is exactly why", "no small thing",
+      "the good news", "the bad news"
+    ]
+  }
+}

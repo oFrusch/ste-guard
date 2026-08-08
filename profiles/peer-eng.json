@@ -1,0 +1,28 @@
+{
+  "name": "peer-eng",
+  "description": "Blunt senior-engineer register. Tight ceiling, bullets by default, every rule on.",
+  "extends": "default",
+
+  "injection": "always",
+
+  "budget": {
+    "words": 130,
+    "sentence_words": 25
+  },
+
+  "rules": {
+    "narration": true,
+    "flourish": true,
+    "prose_wall": true
+  },
+
+  "lists_add": {
+    "narration": [
+      "the explorer found", "the explorer settled", "the review caught",
+      "hunting it", "two caveats it", "one trap worth"
+    ],
+    "flourish": [
+      "is also the correct one", "a clean insertion", "at some point."
+    ]
+  }
+}

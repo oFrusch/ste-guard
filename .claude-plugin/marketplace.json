@@ -1,0 +1,15 @@
+{
+  "name": "ste-guard",
+  "description": "Simplified Technical English enforcement for Claude Code replies.",
+  "owner": {
+    "name": "Owen Carpenter",
+    "url": "https://github.com/ofrusch"
+  },
+  "plugins": [
+    {
+      "name": "ste-guard",
+      "source": "./",
+      "description": "Keeps Claude's replies in Simplified Technical English. Config-driven, with a lazy rule injection that costs nothing on a clean session."
+    }
+  ]
+}

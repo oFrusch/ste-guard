@@ -1,0 +1,14 @@
+{
+  "name": "ste-guard",
+  "displayName": "STE Guard",
+  "version": "0.1.0",
+  "description": "Keeps Claude's replies in Simplified Technical English. A Stop hook checks each reply and blocks once so Claude rewrites it.",
+  "author": {
+    "name": "Owen Conti"
+  },
+  "repository": "https://github.com/owenc343/ste-guard",
+  "license": "MIT",
+  "keywords": ["writing", "style", "ste", "asd-ste100", "linter", "anti-slop"],
+  "hooks": "./hooks/hooks.json",
+  "outputStyles": "./output-styles/"
+}
