@@ -30,9 +30,13 @@ Set `injection` to `always` when you prefer the predictable cost.
 ## Install
 
 ```
-claude plugin marketplace add ofrusch/ste-guard
+claude plugin marketplace add https://github.com/ofrusch/ste-guard.git
 claude plugin install ste-guard@ste-guard
 ```
+
+The `owner/repo` shorthand also works, but Claude Code clones that form over SSH. The full
+HTTPS URL above clones over HTTPS instead, so it works without an SSH key. To keep the
+shorthand and still clone over HTTPS, set `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1`.
 
 Optionally set the output style to `STE` with `/output-style`. The hooks work without it.
 
