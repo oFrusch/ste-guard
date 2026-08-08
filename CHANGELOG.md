@@ -5,6 +5,19 @@ All notable changes to ste-guard appear in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-08-08
+
+### Fixed
+
+- A user profile that extends a bundled profile now keeps the parent's `lists_add` and
+  `lists_remove` deltas. Before this fix, a child that set only a scalar discarded every
+  phrase its parent added.
+
+### Added
+
+- The `STE_GUARD_STATE_DIR` environment variable, so a test run never touches the real state.
+- A smoke test suite that uses the standard library only, plus a CI workflow.
+
 ## [0.1.0] - 2026-08-08
 
 First release.
@@ -26,4 +39,5 @@ First release.
   the phrase lists, so a cited phrase never counts as a violation.
 - The `STE_GUARD_OFF`, `STE_GUARD_DEBUG`, and `STE_GUARD_PROFILE` environment variables.
 
+[0.1.1]: https://github.com/ofrusch/ste-guard/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.1.0

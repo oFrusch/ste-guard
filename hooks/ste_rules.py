@@ -65,9 +65,13 @@ def load_profile():
     if cfg is None:
         cfg = {}
 
+    # The parent's own list deltas must land before the child's, or a grandchild config
+    # that only sets a scalar silently discards every phrase its parent added.
     if cfg.get("extends"):
         parent = _read_json(BUNDLED_PROFILES / f"{cfg['extends']}.json") or {}
+        inherited = _merge_lists(base.get("lists") or {}, parent)
         base = _deep_merge(base, parent)
+        base["lists"] = inherited
 
     profile = _deep_merge(base, cfg)
     profile["lists"] = _merge_lists(base.get("lists") or {}, cfg)

@@ -80,6 +80,31 @@ class ProfileLoading(unittest.TestCase):
         self.assertEqual(p["lists"]["puffery"], ["frobnicate"])
         os.unlink(handle.name)
 
+    def test_a_child_that_sets_only_a_scalar_keeps_the_parent_list_deltas(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({"extends": "peer-eng", "injection": "lazy"}, handle)
+
+        p = profile(handle.name)
+
+        self.assertEqual(p["injection"], "lazy")
+        self.assertEqual(p["budget"]["words"], 130)
+        self.assertIn("hunting it", p["lists"]["narration"])
+        self.assertIn("it found", p["lists"]["narration"])
+        self.assertIn("a clean insertion", p["lists"]["flourish"])
+        os.unlink(handle.name)
+
+    def test_a_child_can_still_remove_what_the_parent_added(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump(
+                {"extends": "peer-eng", "lists_remove": {"narration": ["hunting it"]}}, handle
+            )
+
+        p = profile(handle.name)
+
+        self.assertNotIn("hunting it", p["lists"]["narration"])
+        self.assertIn("the explorer found", p["lists"]["narration"])
+        os.unlink(handle.name)
+
     def test_unknown_profile_name_falls_back_without_a_crash(self):
         p = profile("no-such-profile")
 
