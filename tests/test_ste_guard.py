@@ -276,6 +276,84 @@ class SoftRules(unittest.TestCase):
     def test_active_voice_passes(self):
         self.assertNotIn("Rule 10", self.soft("The parser rejects the payload."))
 
+    def test_an_adjectival_participle_is_not_passive(self):
+        """Ordinary technical prose says "the flag is required". That is not passive voice."""
+        for phrase in (
+            "The flag is required for every request.",
+            "The hook is enabled by default in this build.",
+            "The file is unchanged after the run completes.",
+            "That option is deprecated in the current release.",
+            "The behaviour is undefined when the list is empty.",
+        ):
+            self.assertNotIn("Rule 10", self.soft(phrase), phrase)
+
+    def test_a_real_passive_still_fires(self):
+        for phrase in (
+            "The payload is rejected by the parser.",
+            "The field was written to disk.",
+            "The alert is sent to the on-call engineer.",
+        ):
+            self.assertIn("Rule 10", self.soft(phrase), phrase)
+
+
+class TargetParity(unittest.TestCase):
+    """The Stop hook and the checker must return the same violations, always.
+
+    Claude Code and Codex read the Stop hook. The pi extension reads the checker.
+    Any disagreement means the three agents enforce different rules.
+    """
+
+    SAMPLES = [
+        "The parser rejects the payload when the schema check fails. It logs the reason.",
+        "This robust and seamless parser handles every payload the service receives today. "
+        "It validates each field against the schema before it writes anything to disk here.",
+        "Great question. The parser rejects the payload when the schema check fails today. "
+        "It logs the field name and the reason for the rejection. Let me know if you need more.",
+        " ".join(["word"] * 300),
+        "# Title\n\n" + " ".join(["word"] * 300),
+        'The checker bans the word "robust" and the opener "great question" outright today. '
+        "It blanks any quoted run before it applies the phrase lists to the message text.",
+    ]
+
+    def setUp(self):
+        self.state = tempfile.mkdtemp(prefix="ste-guard-parity-")
+        self.env = dict(os.environ, STE_GUARD_STATE_DIR=self.state, STE_GUARD_PROFILE="default")
+
+    def tearDown(self):
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def stop_hook(self, text, session):
+        payload = {"session_id": session, "last_assistant_message": text}
+        result = subprocess.run(
+            [str(HOOKS / "stop-lint.py")],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            env=self.env,
+        )
+
+        if not result.stdout.strip():
+            return []
+
+        reason = json.loads(result.stdout)["reason"]
+
+        return sorted(line.strip()[2:] for line in reason.splitlines() if line.startswith("  - "))
+
+    def checker(self, text):
+        result = subprocess.run(
+            [str(HOOKS / "ste-check"), "--json"],
+            input=text,
+            capture_output=True,
+            text=True,
+            env=self.env,
+        )
+
+        return sorted(json.loads(result.stdout)["violations"])
+
+    def test_both_targets_agree_on_every_sample(self):
+        for i, text in enumerate(self.SAMPLES):
+            self.assertEqual(self.stop_hook(text, f"parity-{i}"), self.checker(text), text[:50])
+
 
 class ProseWall(unittest.TestCase):
     def test_the_rule_stays_off_in_the_default_profile(self):

@@ -5,6 +5,22 @@ All notable changes to ste-guard appear in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-08-08
+
+### Fixed
+
+- An `-ed` word that acts as an adjective no longer counts as passive voice. Phrases such as
+  "the flag is required" and "the hook is enabled" are ordinary technical prose. A run over
+  68 paragraphs of published documentation dropped from 28 passive hits to 6, and the share
+  of flagged paragraphs fell from 7 percent to 3 percent.
+
+### Added
+
+- A parity test that runs the same samples through the Stop hook and through the checker.
+  Claude Code and Codex read the Stop hook. The pi extension reads the checker. The test
+  fails when the two disagree.
+- Regression tests for the adjectival participles and for real passive voice.
+
 ## [0.3.0] - 2026-08-08
 
 ### Added
@@ -81,6 +97,7 @@ First release.
   the phrase lists, so a cited phrase never counts as a violation.
 - The `STE_GUARD_OFF`, `STE_GUARD_DEBUG`, and `STE_GUARD_PROFILE` environment variables.
 
+[0.3.1]: https://github.com/ofrusch/ste-guard/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.2.0
 [0.1.1]: https://github.com/ofrusch/ste-guard/releases/tag/v0.1.1

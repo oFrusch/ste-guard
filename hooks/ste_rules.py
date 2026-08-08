@@ -106,6 +106,15 @@ PARTICIPLE = (
 )
 PASSIVE = re.compile(rf"\b(?:is|are|was|were|been|being|be)\s+(?:\w+ly\s+)?{PARTICIPLE}\b", re.I)
 
+# These -ed words act as adjectives after a linking verb, so "the flag is required" is not
+# passive voice. Without this list the checker flags a third of ordinary technical prose.
+ADJECTIVAL = {
+    "unchanged", "required", "enabled", "disabled", "restricted", "related", "limited",
+    "detailed", "advanced", "dedicated", "complicated", "involved", "interested",
+    "experienced", "supported", "deprecated", "expected", "unexpected", "reserved",
+    "recommended", "unrelated", "unsupported", "undefined", "unused", "malformed",
+}
+
 # An -ing opener that is a real gerund clause, not a progressive verb or a known noun.
 GERUND_OPENER = re.compile(r"^([A-Z][a-z]+ing)\b(?!\s+(?:is|are|was|were))")
 GERUND_ALLOW = {"Something", "Nothing", "Everything", "Anything", "During", "Bring", "String", "Thing"}
@@ -272,7 +281,8 @@ def find_soft(profile, sentences):
 
         if _on(profile, "passive"):
             passive = PASSIVE.search(sentence)
-            if passive:
+
+            if passive and passive.group(0).split()[-1].lower() not in ADJECTIVAL:
                 hits.append(f'Rule 10 — passive voice "{passive.group(0)}". Name the actor.')
 
     return hits
