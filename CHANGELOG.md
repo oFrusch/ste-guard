@@ -5,6 +5,29 @@ All notable changes to ste-guard appear in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-08
+
+### Added
+
+- Opt-in telemetry. Each turn appends one line to `telemetry.jsonl` with the word count, the
+  rule numbers, and the block decision. The line never holds the message text. Turn it on
+  with `"telemetry": true` in a profile, or with `STE_GUARD_TELEMETRY=1`.
+- `scripts/ste-stats.py`, which reports the block rate, the violations per 100 words, and the
+  share each rule contributes. Use it to find the rules that only nag.
+- `ste-check --fix`. It deletes a filler opener, a hollow closing sentence, and a puffery
+  adjective that stands before a noun. It never rewrites a sentence, and it lists what still
+  needs a person.
+- A signal when the hook gives up. After the chain cap or the repeat guard, the hook now
+  emits a `systemMessage` instead of passing the reply through in silence.
+
+### Changed
+
+- A table cell now counts toward the word ceiling. A 30-row table used to score zero words,
+  so a very long reply passed a 130-word ceiling untouched.
+- A sentence rule never judges a table row. Two cells on one line read as one sentence, which
+  produced false gerund and aside violations. The word count still sees the cells.
+- A word-budget violation now names the longest block and says how many words to cut.
+
 ## [0.3.1] - 2026-08-08
 
 ### Fixed
@@ -97,6 +120,7 @@ First release.
   the phrase lists, so a cited phrase never counts as a violation.
 - The `STE_GUARD_OFF`, `STE_GUARD_DEBUG`, and `STE_GUARD_PROFILE` environment variables.
 
+[0.4.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.4.0
 [0.3.1]: https://github.com/ofrusch/ste-guard/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ofrusch/ste-guard/releases/tag/v0.2.0

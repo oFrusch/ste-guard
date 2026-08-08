@@ -21,6 +21,23 @@ def main():
     text = pathlib.Path(args[0]).read_text() if args else sys.stdin.read()
 
     profile = ste_rules.load_profile()
+
+    if "--fix" in flags:
+        fixed, handled, remaining = ste_rules.autofix(profile, text)
+
+        if args:
+            pathlib.Path(args[0]).write_text(fixed)
+        else:
+            sys.stdout.write(fixed)
+
+        for note in handled:
+            print(f"  fixed: {note}", file=sys.stderr)
+
+        for hit in remaining:
+            print(f"  manual: {hit}", file=sys.stderr)
+
+        return 1 if remaining else 0
+
     result = ste_rules.verdict(profile, text)
 
     if "--json" in flags:

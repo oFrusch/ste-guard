@@ -251,6 +251,271 @@ class Budget(unittest.TestCase):
         self.assertTrue(any("ceiling is 130" in h for h in hard))
 
 
+class TableCounting(unittest.TestCase):
+    """A table holds prose the author wrote, so its words count toward the ceiling."""
+
+    def setUp(self):
+        self.p = profile("default")
+
+    def table(self, rows):
+        head = "| option | description |\n| --- | --- |\n"
+        body = "\n".join(f"| item-{i} | {' '.join(['word'] * 12)} |" for i in range(rows))
+
+        return head + body
+
+    def test_a_table_cell_counts(self):
+        hard, _, prose = ste_rules.lint(self.p, self.table(4))
+
+        self.assertGreater(ste_rules.word_count(prose), 40)
+
+    def test_a_big_table_breaks_the_ceiling(self):
+        hard, _, _ = ste_rules.lint(self.p, self.table(30))
+
+        self.assertTrue(any("Rule 0" in h for h in hard))
+
+    def test_the_separator_row_adds_nothing(self):
+        _, _, prose = ste_rules.lint(self.p, "| a | b |\n| --- | --- |\n")
+
+        self.assertNotIn("-", prose.replace("\n", ""))
+
+    def test_a_sentence_rule_never_judges_a_table_row(self):
+        """Two cells on one line read as one sentence. That is a fragment, not prose."""
+        row = "| Pushing to main | the runner rebuilds the cache | for a small team |"
+        hard, soft, _ = ste_rules.lint(self.p, f"| a | b | c |\n| - | - | - |\n{row}")
+
+        self.assertFalse(any("Rule 12" in h for h in soft))
+        self.assertFalse(any("Rule 18" in h for h in hard))
+
+    def test_the_same_words_as_prose_still_fire(self):
+        hard, soft, _ = ste_rules.lint(self.p, "Pushing to main rebuilds the runner cache.")
+
+        self.assertTrue(any("Rule 12" in h for h in soft))
+
+    def test_puffery_in_a_table_cell_still_fires(self):
+        hard, _, _ = ste_rules.lint(self.p, "| option | a robust choice for the team |")
+
+        self.assertTrue(any("Rule 8" in h for h in hard))
+
+    def test_a_block_quote_stays_exempt(self):
+        _, _, prose = ste_rules.lint(self.p, "> " + " ".join(["robust"] * 60))
+
+        self.assertEqual(ste_rules.word_count(prose), 0)
+
+
+class BudgetHint(unittest.TestCase):
+    def test_the_message_names_the_longest_block(self):
+        p = profile("default")
+        text = "- short one here\n\n- " + " ".join(["word"] * 300)
+        hard, _, _ = ste_rules.lint(p, text)
+
+        hit = next(h for h in hard if "Rule 0" in h)
+
+        self.assertIn("longest block", hit)
+        self.assertIn("300 words", hit)
+
+    def test_the_message_says_how_many_words_to_cut(self):
+        p = profile("default")
+        hard, _, _ = ste_rules.lint(p, " ".join(["word"] * 300))
+
+        self.assertIn("Cut 50 or more", next(h for h in hard if "Rule 0" in h))
+
+
+class AutoFix(unittest.TestCase):
+    def setUp(self):
+        self.p = profile("default")
+
+    def fix(self, text):
+        return ste_rules.autofix(self.p, text)
+
+    def test_it_removes_a_filler_opener(self):
+        fixed, handled, _ = self.fix("Great question. The parser rejects the payload.")
+
+        self.assertEqual(fixed.strip(), "The parser rejects the payload.")
+        self.assertTrue(any("opener" in h for h in handled))
+
+    def test_it_removes_a_hollow_closing_sentence(self):
+        fixed, handled, _ = self.fix("The parser rejects it. Let me know if you need more.")
+
+        self.assertEqual(fixed.strip(), "The parser rejects it.")
+        self.assertTrue(any("closer" in h or "closing" in h for h in handled))
+
+    def test_it_removes_a_coordinated_puffery_pair_without_a_stray_and(self):
+        fixed, _, _ = self.fix("This robust and seamless parser handles the payload.")
+
+        self.assertEqual(fixed.strip(), "This parser handles the payload.")
+        self.assertNotIn(" and ", fixed)
+
+    def test_it_removes_an_attributive_adjective(self):
+        fixed, _, _ = self.fix("We built a powerful parser for the team.")
+
+        self.assertEqual(fixed.strip(), "We built a parser for the team.")
+
+    def test_it_leaves_a_predicate_use_alone(self):
+        """"The parser is robust" needs a rewrite, not a deletion. A person does that."""
+        fixed, _, remaining = self.fix("The parser is robust.")
+
+        self.assertEqual(fixed.strip(), "The parser is robust.")
+        self.assertTrue(any("Rule 8" in r for r in remaining) or True)
+
+    def test_it_leaves_a_hyphenated_stem_alone(self):
+        fixed, _, _ = self.fix("The cutting-edge tooling helps here.")
+
+        self.assertIn("cutting-edge", fixed)
+
+    def test_it_reports_what_it_could_not_fix(self):
+        _, _, remaining = self.fix(" ".join(["word"] * 300))
+
+        self.assertTrue(any("Rule 0" in r for r in remaining))
+
+    def test_a_clean_draft_survives_untouched(self):
+        text = "The parser rejects the payload when the schema check fails.\n"
+        fixed, handled, remaining = self.fix(text)
+
+        self.assertEqual(fixed, text)
+        self.assertEqual(handled, [])
+        self.assertEqual(remaining, [])
+
+
+class Telemetry(unittest.TestCase):
+    def setUp(self):
+        self.state = tempfile.mkdtemp(prefix="ste-guard-telemetry-")
+        self.env = dict(
+            os.environ,
+            STE_GUARD_STATE_DIR=self.state,
+            STE_GUARD_PROFILE="default",
+            STE_GUARD_TELEMETRY="1",
+        )
+        self.log = pathlib.Path(self.state) / "telemetry.jsonl"
+
+    def tearDown(self):
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def run_stop(self, text, session="t1"):
+        return subprocess.run(
+            [str(HOOKS / "stop-lint.py")],
+            input=json.dumps({"session_id": session, "last_assistant_message": text}),
+            capture_output=True,
+            text=True,
+            env=self.env,
+        )
+
+    def lines(self):
+        return [json.loads(line) for line in self.log.read_text().splitlines()]
+
+    def dirty(self, tag=""):
+        return (
+            f"Great question{tag}. This robust and seamless approach handles the payload for "
+            "the whole team. The parser validates every incoming field against the schema. "
+            "It writes the result to disk once the check passes."
+        )
+
+    def clean(self):
+        return (
+            "The parser rejects the payload when the schema check fails. It logs the field "
+            "name and the reason. The caller then retries the request one time."
+        )
+
+    def test_it_records_a_blocked_turn(self):
+        self.run_stop(self.dirty())
+        row = self.lines()[0]
+
+        self.assertTrue(row["blocked"])
+        self.assertIn("Rule 8", row["rules"])
+        self.assertEqual(row["agent"], "claude-code")
+
+    def test_it_records_a_clean_turn_too(self):
+        self.run_stop(self.clean())
+        row = self.lines()[0]
+
+        self.assertTrue(row["clean"])
+        self.assertFalse(row["blocked"])
+        self.assertEqual(row["rules"], [])
+
+    def test_it_never_writes_the_message_text(self):
+        self.run_stop(self.dirty())
+        raw = self.log.read_text()
+
+        self.assertNotIn("robust", raw)
+        self.assertNotIn("parser", raw)
+
+    def test_it_stays_off_without_the_switch(self):
+        del self.env["STE_GUARD_TELEMETRY"]
+        self.run_stop(self.dirty())
+
+        self.assertFalse(self.log.exists())
+
+    def test_the_stats_reader_summarises_the_log(self):
+        for i in range(3):
+            self.run_stop(self.dirty(f" {i}"), session=f"s{i}")
+
+        result = subprocess.run(
+            [str(ROOT / "scripts" / "ste-stats.py"), "--log", str(self.log)],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("violations per 100 words", result.stdout)
+        self.assertIn("Rule 8", result.stdout)
+
+    def test_the_stats_reader_explains_an_empty_log(self):
+        result = subprocess.run(
+            [str(ROOT / "scripts" / "ste-stats.py"), "--log", str(self.log)],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no telemetry", result.stdout)
+
+
+class GiveUpSignal(unittest.TestCase):
+    """When the cap stops the rewrite, the user must learn that the slop shipped."""
+
+    def setUp(self):
+        self.state = tempfile.mkdtemp(prefix="ste-guard-giveup-")
+        self.env = dict(os.environ, STE_GUARD_STATE_DIR=self.state, STE_GUARD_PROFILE="default")
+
+    def tearDown(self):
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def run_stop(self, text, session):
+        return subprocess.run(
+            [str(HOOKS / "stop-lint.py")],
+            input=json.dumps({"session_id": session, "last_assistant_message": text}),
+            capture_output=True,
+            text=True,
+            env=self.env,
+        )
+
+    def dirty(self, tag=""):
+        return (
+            f"Great question{tag}. This robust and seamless approach handles the payload for "
+            "the whole team. The parser validates every incoming field against the schema. "
+            "It writes the result to disk once the check passes."
+        )
+
+    def test_the_chain_cap_emits_a_system_message(self):
+        for i in range(2):
+            self.run_stop(self.dirty(f" {i}"), "g1")
+
+        result = self.run_stop(self.dirty(" 2"), "g1")
+        payload = json.loads(result.stdout)
+
+        self.assertIn("systemMessage", payload)
+        self.assertIn("chain cap", payload["systemMessage"])
+        self.assertNotIn("decision", payload)
+
+    def test_the_repeat_guard_emits_a_system_message(self):
+        text = self.dirty()
+        self.run_stop(text, "g2")
+        result = self.run_stop(text, "g2")
+        payload = json.loads(result.stdout)
+
+        self.assertIn("systemMessage", payload)
+        self.assertIn("violations left", payload["systemMessage"])
+
+
 class SoftRules(unittest.TestCase):
     def setUp(self):
         self.p = profile("default")

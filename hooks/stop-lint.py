@@ -96,21 +96,28 @@ def main():
         )
 
     if not violations:
+        ste_rules.record(profile, result, "claude-code", blocked=False)
         clear_chain_and_allow()
 
     digest = hashlib.md5(message.encode("utf-8", "replace")).hexdigest()
     per_message = profile.get("max_blocks_per_message", 1)
     per_chain = profile.get("max_blocks_per_chain", 2)
 
+    def give_up(note):
+        """The cap stopped the rewrite. Say so, or the slop ships with no signal."""
+        ste_rules.record(profile, result, "claude-code", blocked=False)
+        print(json.dumps({"systemMessage": f"ste-guard: {note}", "suppressOutput": True}))
+        sys.exit(0)
+
     # A rewrite is a new digest, so the per-message guard alone cannot stop a ping-pong.
     # The chain budget caps consecutive blocks and only resets on a message that passes.
     if record.get("digest") == digest and record.get("blocks", 0) >= per_message:
-        allow()
+        give_up(f"{len(violations)} violations left after the rewrite. Sent as written.")
 
     if record.get("chain", 0) >= per_chain:
         record.update({"digest": digest, "blocks": 1})
         ste_rules.save_state(session, record)
-        allow()
+        give_up(f"chain cap of {per_chain} reached, {len(violations)} violations left.")
 
     blocks = record.get("blocks", 0) + 1 if record.get("digest") == digest else 1
 
@@ -118,8 +125,9 @@ def main():
     ste_rules.save_state(session, record)
 
     if blocks > per_message:
-        allow()
+        give_up(f"{len(violations)} violations left after the rewrite. Sent as written.")
 
+    ste_rules.record(profile, result, "claude-code", blocked=True)
     print(json.dumps({"decision": "block", "reason": ste_rules.rewrite_prompt(violations)}))
     sys.exit(0)
 

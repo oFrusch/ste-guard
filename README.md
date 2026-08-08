@@ -148,6 +148,35 @@ Write `~/.claude/ste-guard.json` to keep the grammar rules and drop the word cei
 }
 ```
 
+## Fix the reflex failures without a rewrite
+
+```
+ste-check --fix draft.md
+echo "$DRAFT" | ste-check --fix
+```
+
+The fixer deletes a filler opener, a hollow closing sentence, and a puffery adjective that
+stands before a noun. It never rewrites a sentence. It reports every fix on stderr, and it
+lists what still needs a person.
+
+The fixer is deliberately timid. It leaves a predicate use such as "the parser is robust"
+alone, because a deletion there breaks the sentence. It leaves a hyphenated entry alone,
+because the phrase list holds stems.
+
+## Measure the rules
+
+Telemetry is off by default. Turn it on with `"telemetry": true` in your profile, or with
+`STE_GUARD_TELEMETRY=1`. Each turn appends one line to `telemetry.jsonl` in the state
+directory. The line holds counts and rule numbers only. It never holds your message text.
+
+```
+scripts/ste-stats.py
+```
+
+The reader prints the block rate, the mean words per turn, the violations per 100 words, and
+the share each rule contributes. Use it to find the rules that only nag, then switch them off
+in your profile.
+
 ## Quoted text is exempt
 
 The checker blanks any run inside double quotes before it applies the phrase lists. Claude
@@ -161,6 +190,8 @@ Inline code, fenced code, block quotes, links, and file paths are also exempt.
 | `STE_GUARD_OFF=1` | Disables every hook |
 | `STE_GUARD_DEBUG=1` | Writes the hard and soft counts to stderr |
 | `STE_GUARD_PROFILE` | Selects a bundled profile by name, or a profile file by path |
+| `STE_GUARD_TELEMETRY=1` | Records one line per turn, without the message text |
+| `STE_GUARD_STATE_DIR` | Moves the block counters and the telemetry log |
 
 ## Limits
 
