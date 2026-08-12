@@ -1,0 +1,29 @@
+{
+  "name": "docs",
+  "description": "Full STE for a markdown file. No word ceiling, every phrase rule on.",
+  "extends": "peer-eng",
+
+  "injection": "never",
+
+  "min_words_to_lint": 15,
+  "soft_block_threshold": 3,
+
+  "budget": {
+    "words": null,
+    "sentence_words": 25,
+    "uncapped_on_heading": true
+  },
+
+  "rules": {
+    "openers": true,
+    "closers": true,
+    "puffery": true,
+    "not_just": true,
+    "asides": true,
+    "gerund": true,
+    "passive": true,
+    "narration": true,
+    "flourish": true,
+    "prose_wall": false
+  }
+}

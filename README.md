@@ -11,7 +11,9 @@ Claude talks too much. This makes it talk less.
    violations. Claude rewrites and sends the clean version.
 3. A `UserPromptSubmit` hook injects the full rule text with the exact banned strings. In
    the default lazy mode this hook stays silent until the `Stop` hook blocks once.
-4. A `ste-check` command lets Claude lint a draft before it sends the draft.
+4. A `PreToolUse` hook checks the markdown a `Write` or an `Edit` puts on disk. When a rule
+   fails, the hook denies the call and returns the violations. It reads markdown only.
+5. A `ste-check` command lets Claude lint a draft before it sends the draft.
 
 The rules come from ASD-STE100, adapted for chat. This is not certified conformance. The
 ASD licenses the official approved dictionary, so this repository does not carry it.
@@ -85,6 +87,31 @@ session with `pi -e ./extensions/ste-guard.ts`.
 - The extension holds no rules of its own. It runs the same Python checker the other two
   agents run.
 
+## Pick your features
+
+Run the setup script for the questions. It writes `~/.claude/ste-guard.json`, and it backs up
+the file it replaces.
+
+```bash
+python3 ~/.claude/plugins/ste-guard/scripts/ste-setup.py
+```
+
+Inside a session, run `/ste-setup` instead. Claude asks the questions and runs the script.
+
+| Flag | Effect |
+| :-- | :-- |
+| `--show` | Prints the current config |
+| `--profile default\|peer-eng` | The register to extend |
+| `--write-guard deny\|warn\|off` | What the write guard does with a failing file |
+| `--injection lazy\|always\|never` | When the hook injects the full rule text |
+| `--telemetry on\|off` | Records one line per turn, with no message text |
+| `--rules-off a,b` | Turns named rules off |
+| `--rules-on a,b` | Turns named rules on |
+| `--write-suffixes .md,.mdx` | The file types the write guard reads |
+| `--reset` | Deletes the config and falls back to the bundled default |
+
+`STE_GUARD_PROFILE` wins over this file. Unset it before you run the setup script.
+
 ## Configuration
 
 ste-guard resolves the active profile in this order:
@@ -135,6 +162,8 @@ override only the keys you want.
 - `default` — the ASD-STE100 chat subset with a 250-word ceiling. Grammar only, no voice.
 - `peer-eng` — a blunt senior-engineer register. A 130-word ceiling, bullets by default,
   every rule on.
+- `docs` — full STE for a file on disk. No word ceiling, every phrase rule on. The write
+  guard always runs this profile, whatever the session runs.
 
 ### Example
 
@@ -188,6 +217,7 @@ Inline code, fenced code, block quotes, links, and file paths are also exempt.
 | Variable | Effect |
 | :-- | :-- |
 | `STE_GUARD_OFF=1` | Disables every hook |
+| `STE_GUARD_WRITE_OFF=1` | Disables the write guard, and leaves the reply guard on |
 | `STE_GUARD_DEBUG=1` | Writes the hard and soft counts to stderr |
 | `STE_GUARD_PROFILE` | Selects a bundled profile by name, or a profile file by path |
 | `STE_GUARD_TELEMETRY=1` | Records one line per turn, without the message text |
@@ -201,6 +231,10 @@ Inline code, fenced code, block quotes, links, and file paths are also exempt.
   them. Only a rewrite can.
 - The checker matches fixed strings. A model that invents a new filler phrase gets through
   until you add the phrase to a list.
+- The write guard reads `.md`, `.markdown`, and `.mdx` only. A comment in a source file, a
+  commit message, and a PR body all pass with no check.
+- The write guard reads the tool names `Write`, `Edit`, and `MultiEdit`. Another agent that
+  edits a file under a different tool name gets through.
 
 ## Tests
 

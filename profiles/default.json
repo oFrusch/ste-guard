@@ -16,6 +16,13 @@
     "closer_window": 320
   },
 
+  "write_guard": {
+    "enabled": true,
+    "mode": "deny",
+    "profile": "docs",
+    "suffixes": [".md", ".markdown", ".mdx"]
+  },
+
   "rules": {
     "openers": true,
     "closers": true,

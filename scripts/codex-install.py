@@ -21,6 +21,7 @@ MARKER = "ste-guard"
 EVENTS = [
     ("SessionStart", "session-brief.py", 5),
     ("UserPromptSubmit", "prompt-contract.py", 5),
+    ("PreToolUse", "write-lint.py", 10),
     ("Stop", "stop-lint.py", 10),
 ]
 

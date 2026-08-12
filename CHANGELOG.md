@@ -5,6 +5,34 @@ All notable changes to ste-guard appear in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-08-12
+
+### Added
+
+- A write guard. A `PreToolUse` hook checks the markdown a `Write`, an `Edit`, or a
+  `MultiEdit` puts on disk. The Stop hook reads chat text only, so a README or a spec written
+  through a file tool never met a rule before this release.
+- The `docs` profile. It runs full STE with no word ceiling, because a chat ceiling means
+  nothing in a file. The write guard runs this profile whatever the session runs.
+- A `write_guard` block in the profile schema. It holds `enabled`, `mode`, `profile`, and
+  `suffixes`. In `warn` mode the hook reports the violations and lets the write land.
+- `scripts/ste-setup.py` and the `/ste-setup` command. A user picks the register, the write
+  guard mode, the rule card timing, the telemetry switch, and any single rule. The script
+  writes `~/.claude/ste-guard.json` and backs up the file it replaces.
+- The `STE_GUARD_CONFIG` environment variable, which moves the user config file.
+- The `STE_GUARD_WRITE_OFF` environment variable, which stops the write guard alone.
+
+### Changed
+
+- `load_profile()` takes an optional profile name. The write guard pins the lint profile, so
+  the session profile never reaches it.
+- `commands/` now ships in the npm package.
+
+### Notes
+
+- The write guard reads `.md`, `.markdown`, and `.mdx` by default. A comment in a source file,
+  a commit message, and a PR body all pass with no check.
+
 ## [0.5.0] - 2026-08-12
 
 ### Added

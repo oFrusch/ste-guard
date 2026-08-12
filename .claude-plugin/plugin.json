@@ -1,7 +1,7 @@
 {
   "name": "ste-guard",
   "displayName": "STE Guard",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Keeps Claude's replies in Simplified Technical English. A Stop hook checks each reply and blocks once so Claude rewrites it.",
   "author": {
     "name": "Owen Carpenter"

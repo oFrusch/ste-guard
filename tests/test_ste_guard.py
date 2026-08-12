@@ -935,7 +935,7 @@ class Manifests(unittest.TestCase):
         data = json.loads((HOOKS / "hooks.json").read_text())
         events = data["hooks"]
 
-        self.assertEqual(set(events), {"SessionStart", "UserPromptSubmit", "Stop"})
+        self.assertEqual(set(events), {"SessionStart", "UserPromptSubmit", "PreToolUse", "Stop"})
 
         for entries in events.values():
             for entry in entries:
@@ -1053,12 +1053,15 @@ class CodexInstaller(unittest.TestCase):
     def commands(self, events):
         return [h["command"] for entries in events.values() for e in entries for h in e["hooks"]]
 
-    def test_it_writes_all_three_events(self):
+    def test_it_writes_every_event(self):
         self.hooks.write_text(json.dumps({"hooks": {}}))
         result = self.run_installer()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(set(self.read()), {"SessionStart", "UserPromptSubmit", "Stop"})
+        self.assertEqual(
+            set(self.read()),
+            {"SessionStart", "UserPromptSubmit", "PreToolUse", "Stop"},
+        )
 
     def test_it_preserves_unrelated_hooks(self):
         other = {"type": "command", "command": "rtk hook claude"}
@@ -1072,7 +1075,7 @@ class CodexInstaller(unittest.TestCase):
         self.run_installer()
         self.run_installer()
 
-        self.assertEqual(len(self.commands(self.read())), 3)
+        self.assertEqual(len(self.commands(self.read())), 4)
 
     def test_it_strips_the_predecessor_scripts(self):
         legacy = {"type": "command", "command": "'/home/me/.codex/hooks/ste-lint.py'"}
@@ -1080,7 +1083,7 @@ class CodexInstaller(unittest.TestCase):
         self.run_installer()
 
         self.assertNotIn(legacy["command"], self.commands(self.read()))
-        self.assertEqual(len(self.commands(self.read())), 3)
+        self.assertEqual(len(self.commands(self.read())), 4)
 
     def test_uninstall_removes_only_our_entries(self):
         other = {"type": "command", "command": "rtk hook claude"}
@@ -1101,7 +1104,7 @@ class CodexInstaller(unittest.TestCase):
         result = self.run_installer()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(self.commands(self.read())), 3)
+        self.assertEqual(len(self.commands(self.read())), 4)
 
     def test_malformed_json_stops_the_installer(self):
         self.hooks.write_text("{not json")
@@ -1109,6 +1112,263 @@ class CodexInstaller(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("not valid JSON", result.stderr)
+
+
+class WriteGuard(unittest.TestCase):
+    """The PreToolUse hook judges markdown a file tool writes. It never judges code."""
+
+    def setUp(self):
+        self.state = tempfile.mkdtemp(prefix="ste-guard-test-")
+        self.env = dict(os.environ, STE_GUARD_STATE_DIR=self.state, STE_GUARD_PROFILE="peer-eng")
+
+    def tearDown(self):
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def run_hook(self, tool, tool_input):
+        return subprocess.run(
+            [str(HOOKS / "write-lint.py")],
+            input=json.dumps({"tool_name": tool, "tool_input": tool_input}),
+            capture_output=True,
+            text=True,
+            env=self.env,
+        )
+
+    def denied(self, result):
+        if not result.stdout.strip():
+            return False
+
+        payload = json.loads(result.stdout)["hookSpecificOutput"]
+
+        return payload.get("permissionDecision") == "deny"
+
+    def dirty(self):
+        return (
+            "This service provides a framework for a robust and seamless pipeline. "
+            "It is a single source of truth for the team."
+        )
+
+    def clean(self):
+        return (
+            "The service reads the queue and writes each row to Postgres. "
+            "It retries a failed row one time, then moves the row to the dead letter table."
+        )
+
+    def test_it_denies_dirty_markdown(self):
+        result = self.run_hook("Write", {"file_path": "/tmp/spec.md", "content": self.dirty()})
+
+        self.assertTrue(self.denied(result))
+
+    def test_it_allows_clean_markdown(self):
+        result = self.run_hook("Write", {"file_path": "/tmp/spec.md", "content": self.clean()})
+
+        self.assertFalse(self.denied(result))
+
+    def test_it_ignores_a_code_file(self):
+        result = self.run_hook("Write", {"file_path": "/tmp/parser.go", "content": self.dirty()})
+
+        self.assertFalse(self.denied(result))
+
+    def test_it_reads_the_new_side_of_an_edit(self):
+        result = self.run_hook(
+            "Edit",
+            {"file_path": "/tmp/spec.md", "old_string": "old", "new_string": self.dirty()},
+        )
+
+        self.assertTrue(self.denied(result))
+
+    def test_an_old_string_alone_never_denies(self):
+        """The old text leaves the file, so its prose is moot."""
+        result = self.run_hook(
+            "Edit",
+            {"file_path": "/tmp/spec.md", "old_string": self.dirty(), "new_string": self.clean()},
+        )
+
+        self.assertFalse(self.denied(result))
+
+    def test_it_ignores_a_fenced_code_block(self):
+        fenced = "# Notes\n\n```go\n// a robust and seamless parser handles the payload here\nfunc main() {}\n```\n"
+        result = self.run_hook("Write", {"file_path": "/tmp/spec.md", "content": fenced})
+
+        self.assertFalse(self.denied(result))
+
+    def test_the_off_switch_stops_it(self):
+        env = dict(self.env, STE_GUARD_WRITE_OFF="1")
+        result = subprocess.run(
+            [str(HOOKS / "write-lint.py")],
+            input=json.dumps(
+                {"tool_name": "Write", "tool_input": {"file_path": "/tmp/spec.md", "content": self.dirty()}}
+            ),
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+
+        self.assertFalse(self.denied(result))
+
+    def test_it_uses_the_docs_profile_whatever_the_session_runs(self):
+        """A chat ceiling means nothing in a file, so the session profile must not reach it."""
+        long_clean = self.clean() + " The worker logs the row id. " * 40
+        result = self.run_hook("Write", {"file_path": "/tmp/spec.md", "content": long_clean})
+
+        self.assertFalse(self.denied(result))
+
+
+class WriteGuardSettings(unittest.TestCase):
+    """The write_guard block in the profile drives the hook. A user tunes it without an env var."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="ste-guard-test-")
+        self.config = pathlib.Path(self.dir) / "cfg.json"
+        self.env = dict(os.environ, STE_GUARD_CONFIG=str(self.config))
+        self.env.pop("STE_GUARD_PROFILE", None)
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def set_guard(self, block):
+        self.config.write_text(json.dumps({"extends": "default", "write_guard": block}))
+
+    DIRTY = (
+        "This service provides a framework for a robust and seamless pipeline. "
+        "It is a single source of truth for the whole team."
+    )
+
+    def run_hook(self, content=DIRTY):
+        return subprocess.run(
+            [str(HOOKS / "write-lint.py")],
+            input=json.dumps(
+                {"tool_name": "Write", "tool_input": {"file_path": "/tmp/spec.md", "content": content}}
+            ),
+            capture_output=True,
+            text=True,
+            env=self.env,
+        )
+
+    def test_the_default_profile_ships_the_block(self):
+        p = ste_rules.load_profile("default")
+
+        self.assertTrue(p["write_guard"]["enabled"])
+        self.assertEqual(p["write_guard"]["mode"], "deny")
+        self.assertEqual(p["write_guard"]["profile"], "docs")
+
+    def test_enabled_false_stops_the_hook(self):
+        self.set_guard({"enabled": False})
+
+        self.assertEqual(self.run_hook().stdout.strip(), "")
+
+    def test_warn_mode_lets_the_write_land(self):
+        self.set_guard({"enabled": True, "mode": "warn"})
+        out = json.loads(self.run_hook().stdout)
+
+        self.assertIn("systemMessage", out)
+        self.assertNotIn("hookSpecificOutput", out)
+
+    def test_deny_mode_blocks_the_write(self):
+        self.set_guard({"enabled": True, "mode": "deny"})
+        out = json.loads(self.run_hook().stdout)
+
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_a_suffix_outside_the_list_never_reaches_the_lint(self):
+        self.set_guard({"enabled": True, "mode": "deny", "suffixes": [".mdx"]})
+
+        self.assertEqual(self.run_hook().stdout.strip(), "")
+
+
+class SetupScript(unittest.TestCase):
+    """The setup script writes the user config, so no user hand-edits JSON."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="ste-guard-test-")
+        self.config = pathlib.Path(self.dir) / "cfg.json"
+        self.env = dict(os.environ, STE_GUARD_CONFIG=str(self.config))
+        self.env.pop("STE_GUARD_PROFILE", None)
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def run_setup(self, *flags):
+        return subprocess.run(
+            [str(ROOT / "scripts" / "ste-setup.py"), *flags],
+            capture_output=True,
+            text=True,
+            env=self.env,
+            stdin=subprocess.DEVNULL,
+        )
+
+    def read(self):
+        return json.loads(self.config.read_text())
+
+    def test_it_writes_the_chosen_register(self):
+        self.run_setup("--profile", "peer-eng")
+
+        self.assertEqual(self.read()["extends"], "peer-eng")
+
+    def test_it_writes_the_write_guard_mode(self):
+        self.run_setup("--write-guard", "warn")
+
+        self.assertEqual(self.read()["write_guard"], {"enabled": True, "mode": "warn"})
+
+    def test_off_disables_the_write_guard_without_a_mode(self):
+        self.run_setup("--write-guard", "off")
+
+        self.assertFalse(self.read()["write_guard"]["enabled"])
+
+    def test_it_turns_named_rules_off(self):
+        self.run_setup("--rules-off", "passive,gerund")
+        rules = self.read()["rules"]
+
+        self.assertFalse(rules["passive"])
+        self.assertFalse(rules["gerund"])
+
+    def test_a_second_run_keeps_the_earlier_answers(self):
+        self.run_setup("--profile", "peer-eng")
+        self.run_setup("--telemetry", "on")
+        cfg = self.read()
+
+        self.assertEqual(cfg["extends"], "peer-eng")
+        self.assertTrue(cfg["telemetry"])
+
+    def test_it_backs_up_before_it_overwrites(self):
+        self.run_setup("--profile", "peer-eng")
+        self.run_setup("--profile", "default")
+
+        self.assertTrue(self.config.with_suffix(".json.bak").exists())
+
+    def test_reset_removes_the_config(self):
+        self.run_setup("--profile", "peer-eng")
+        self.run_setup("--reset")
+
+        self.assertFalse(self.config.exists())
+
+    def test_a_suffix_list_gains_the_leading_dot(self):
+        self.run_setup("--write-suffixes", "md,mdx")
+
+        self.assertEqual(self.read()["write_guard"]["suffixes"], [".md", ".mdx"])
+
+    def test_no_flags_and_no_terminal_prints_the_help(self):
+        result = self.run_setup()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("--write-guard", result.stdout)
+
+    def test_the_written_config_drives_the_engine(self):
+        self.run_setup("--profile", "peer-eng", "--rules-off", "puffery")
+        source = f"import os, sys; os.environ['STE_GUARD_CONFIG'] = {str(self.config)!r}"
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                f"{source}; sys.path.insert(0, {str(HOOKS)!r}); import ste_rules; "
+                "p = ste_rules.load_profile(); print(p['budget']['words'], p['rules']['puffery'])",
+            ],
+            capture_output=True,
+            text=True,
+            env={k: v for k, v in self.env.items() if k != "STE_GUARD_CONFIG"},
+        )
+
+        self.assertEqual(result.stdout.strip(), "130 False", result.stderr)
 
 
 if __name__ == "__main__":

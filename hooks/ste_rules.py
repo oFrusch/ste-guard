@@ -12,7 +12,9 @@ import re
 
 PLUGIN_ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUNDLED_PROFILES = PLUGIN_ROOT / "profiles"
-USER_CONFIG = pathlib.Path(os.path.expanduser("~/.claude/ste-guard.json"))
+USER_CONFIG = pathlib.Path(
+    os.environ.get("STE_GUARD_CONFIG") or os.path.expanduser("~/.claude/ste-guard.json")
+)
 
 STATE_DIR = pathlib.Path(
     os.environ.get("STE_GUARD_STATE_DIR") or os.path.expanduser("~/.claude/.ste-guard-state")
@@ -49,11 +51,15 @@ def _merge_lists(base, cfg):
     return merged
 
 
-def load_profile():
-    """Resolve the active profile. Env override, then user config, then the bundled default."""
+def load_profile(force=None):
+    """Resolve the active profile. Env override, then user config, then the bundled default.
+
+    A caller passes force to pin one profile. The write guard needs the docs rules whatever
+    the session runs, so the session profile must not reach it.
+    """
     base = _read_json(BUNDLED_PROFILES / "default.json") or {}
 
-    named = os.environ.get("STE_GUARD_PROFILE")
+    named = force or os.environ.get("STE_GUARD_PROFILE")
     cfg = None
 
     if named:
@@ -509,6 +515,18 @@ def rewrite_prompt(violations, limit=8):
         "Keep the same content and the same conclusions. Fix only the prose.\n\n"
         f"{listed}\n\n"
         "Do not explain the rewrite. Just send the clean version."
+    )
+
+
+def write_prompt(violations, path, limit=8):
+    """The denial text for a blocked file write. A retry replaces the tool call, not a reply."""
+    listed = "\n".join(f"  - {item}" for item in violations[:limit])
+
+    return (
+        f"STE lint failed on the markdown for {path}. Fix the prose, then write it again.\n"
+        "Keep the same content and the same conclusions.\n\n"
+        f"{listed}\n\n"
+        "Do not explain the change. Just send the corrected write."
     )
 
 
