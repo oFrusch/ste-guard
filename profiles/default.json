@@ -39,13 +39,70 @@
     "closers": [
       "let me know if", "hope this helps", "hope that helps", "feel free to",
       "don't hesitate to", "do not hesitate to", "anything else i can",
-      "is there anything else", "happy to clarify", "let me know how"
+      "is there anything else", "happy to clarify", "let me know how",
+      "say the word", "say go"
     ],
     "puffery": [
       "robust", "seamless", "leverage", "leverages", "leveraging", "delve", "delves",
       "powerful", "elevate", "elevates", "unlock", "unlocks", "game-chang",
       "cutting-edge", "best-in-class", "state-of-the-art", "supercharge",
-      "streamline", "streamlines", "holistic", "synergy", "utilize", "utilizes"
+      "streamline", "streamlines", "holistic", "synergy", "utilize", "utilizes",
+
+      "comprehensive", "sophisticated", "innovative", "transformative", "frictionless",
+      "revolutionize", "revolutionizes", "empower", "empowers", "operationalize",
+      "synergize", "facilitate", "facilitates",
+
+      "next-generation", "world-class", "highly scalable", "highly flexible",
+      "highly performant", "production-ready", "production-grade", "enterprise-grade",
+      "enterprise-ready", "battle-tested", "future-proof",
+
+      "drive value", "deliver value", "maximize impact", "drive impact",
+      "meaningful impact", "improve outcomes", "drive results", "accelerate innovation",
+      "enhance productivity", "improve efficiency", "boost performance",
+      "optimize workflows", "enable organizations", "transform the way",
+      "to the next level",
+
+      "align stakeholders", "drive alignment", "strategic initiative", "key initiative",
+      "key stakeholders", "core competency", "value proposition", "strategic priorities",
+      "business needs", "organizational objectives", "actionable insights",
+      "key learnings", "strategic insights", "meaningful insights", "critical insights",
+      "thought leadership", "stakeholder buy-in",
+
+      "scalable architecture", "flexible architecture", "extensible architecture",
+      "scalable solution", "flexible solution", "unified platform",
+      "centralized platform", "single source of truth", "end-to-end solution",
+      "full-stack solution", "deep integration", "developer-first", "user-centric",
+      "human-centered", "mission-critical", "ai-powered", "ai-driven",
+
+      "provides a framework for", "provides a foundation for",
+      "serves as a foundation for", "serves as a key component",
+      "plays a critical role", "is crucial for", "helps ensure", "allows users to",
+      "enables users to", "makes it easier to", "supports a wide range of",
+      "offers the ability to", "provides the flexibility to",
+
+      "tailored to your needs", "depending on your specific requirements",
+      "based on your unique needs", "a wide range of use cases", "various use cases",
+      "diverse scenarios", "across industries", "for organizations of all sizes",
+      "at every stage", "regardless of scale", "rapidly evolving landscape",
+      "increasingly complex environment",
+
+      "cohesive experience", "foster collaboration", "foster innovation",
+      "foster engagement", "drive adoption", "increase visibility",
+      "improve transparency", "enhance discoverability", "reduce friction",
+      "break down silos", "bridge the gap", "meet users where they are",
+      "drive meaningful change", "position the organization for success",
+      "set the stage for", "pave the way for", "lay the groundwork for",
+
+      "clean and maintainable", "scalable and maintainable", "reliable and performant",
+      "secure and scalable", "flexible and extensible", "simple yet powerful",
+      "intuitive yet flexible", "lightweight yet powerful",
+      "without sacrificing performance", "without compromising flexibility",
+      "while maintaining scalability",
+
+      "agentic architecture", "agentic framework", "cognitive architecture",
+      "compound ai system", "reasoning layer", "intelligent agents",
+      "intelligent automation", "autonomous decision-making", "adaptive workflows",
+      "dynamic tool selection", "tool-use capabilities"
     ],
     "narration": [
       "it found", "it caught", "it also found", "it turned up", "it settled",
@@ -55,7 +112,21 @@
     "flourish": [
       "here's the thing", "therein lies", "the real question is whether",
       "and that is the point", "which is exactly why", "no small thing",
-      "the good news", "the bad news"
+      "the good news", "the bad news",
+      "load bearing", "load-bearing", "idempotent",
+
+      "it's worth noting that", "it is worth noting that",
+      "it's important to note that", "it is important to note that",
+      "importantly", "notably", "crucially", "ultimately", "fundamentally",
+      "at its core", "in essence", "that said", "with that in mind",
+      "from a broader perspective", "moving forward", "going forward",
+      "when it comes to", "the key takeaway is", "the bottom line is",
+
+      "one-size-fits-all", "it depends on your specific needs",
+      "several factors to consider", "a few key considerations",
+      "both approaches have their merits", "the right choice depends on",
+      "striking the right balance", "a nuanced approach", "a thoughtful approach",
+      "careful consideration", "depends on the context"
     ]
   }
 }

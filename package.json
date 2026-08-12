@@ -1,6 +1,6 @@
 {
   "name": "ste-guard",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Keeps agent replies in Simplified Technical English. Ships for pi, Claude Code, and Codex from one rule engine.",
   "keywords": [
     "pi-package",

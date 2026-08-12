@@ -188,6 +188,43 @@ class HardRules(unittest.TestCase):
         self.p = profile("peer-eng")
         self.assertIn("Rule 19", self.hits("Here's the thing. The parser rejects the payload."))
 
+    def test_load_bearing_fires_in_peer_eng(self):
+        self.p = profile("peer-eng")
+        self.assertIn("Rule 19", self.hits("That flag is load-bearing for the parser."))
+        self.assertIn("Rule 19", self.hits("That flag is load bearing for the parser."))
+
+    def test_idempotent_fires_in_peer_eng(self):
+        self.p = profile("peer-eng")
+        self.assertIn("Rule 19", self.hits("The retry path is idempotent for every write."))
+
+    def test_marketing_phrases_fire_as_puffery(self):
+        self.assertIn("Rule 8", self.hits("The parser is a single source of truth."))
+        self.assertIn("Rule 8", self.hits("It provides a framework for the parser."))
+        self.assertIn("Rule 8", self.hits("The parser is clean and maintainable."))
+
+    def test_provable_technical_words_do_not_fire(self):
+        text = "The scheduler is scalable, secure, deterministic, distributed and observable."
+        self.assertNotIn("Rule 8", self.hits(text))
+
+    def test_agent_domain_nouns_do_not_fire(self):
+        self.p = profile("peer-eng")
+        text = "The multi-agent system keeps guardrails, a memory layer and human oversight."
+        self.assertEqual(self.hits(text), "")
+
+    def test_transition_cliches_fire_in_peer_eng(self):
+        self.p = profile("peer-eng")
+        self.assertIn("Rule 19", self.hits("At its core the parser rejects the payload."))
+        self.assertIn("Rule 19", self.hits("The parser rejects it. That said, it retries."))
+
+    def test_multi_word_puffery_is_never_autofixed(self):
+        auto = [w for w in self.p["lists"]["puffery"] if w.isalpha()]
+        self.assertNotIn("single source of truth", auto)
+        self.assertNotIn("production-ready", auto)
+
+    def test_offer_to_proceed_closers_fire(self):
+        self.assertIn("Rule 7", self.hits("The parser rejects it. Just say the word."))
+        self.assertIn("Rule 7", self.hits("The parser rejects it. Say go and I start."))
+
 
 class QuotedExemption(unittest.TestCase):
     def setUp(self):
@@ -349,6 +386,31 @@ class AutoFix(unittest.TestCase):
         fixed, _, _ = self.fix("We built a powerful parser for the team.")
 
         self.assertEqual(fixed.strip(), "We built a parser for the team.")
+
+    def test_it_repairs_the_article_after_a_removal(self):
+        fixed, _, _ = self.fix("We shipped a comprehensive audit of the parser.")
+
+        self.assertEqual(fixed.strip(), "We shipped an audit of the parser.")
+
+    def test_it_shortens_the_article_when_the_new_noun_takes_a(self):
+        fixed, _, _ = self.fix("It is an innovative parser for the payload.")
+
+        self.assertEqual(fixed.strip(), "It is a parser for the payload.")
+
+    def test_it_judges_the_article_by_sound_not_by_letter(self):
+        fixed, _, _ = self.fix("The team wrote a robust user guide.")
+
+        self.assertEqual(fixed.strip(), "The team wrote a user guide.")
+
+    def test_it_repairs_the_article_after_a_coordinated_pair(self):
+        fixed, _, _ = self.fix("A comprehensive and robust audit runs nightly.")
+
+        self.assertEqual(fixed.strip(), "An audit runs nightly.")
+
+    def test_it_leaves_a_determiner_that_is_not_an_article_alone(self):
+        fixed, _, _ = self.fix("We keep this powerful engine for the team.")
+
+        self.assertEqual(fixed.strip(), "We keep this engine for the team.")
 
     def test_it_leaves_a_predicate_use_alone(self):
         """"The parser is robust" needs a rewrite, not a deletion. A person does that."""

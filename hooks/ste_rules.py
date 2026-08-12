@@ -378,7 +378,27 @@ RULE_ID = re.compile(r"^(Rule \d+)")
 
 # A puffery adjective sits before a noun, so its removal leaves a grammatical phrase.
 # "a robust parser" becomes "a parser". A predicate use needs a human, so it stays.
-ADJECTIVE_SLOT = r"(?:\b(?:a|an|the|this|that|these|those|our|its|their|and|very|more|most)\s+)"
+DETERMINER = r"a|an|the|this|that|these|those|our|its|their|and|very|more|most"
+
+# English picks a or an by sound. These prefixes are the traps a first-letter test gets wrong.
+SOUNDS_CONSONANT = re.compile(r"^(?:u(?:ni|se|su|ti|til|rl|i\b|uid)|eu|one|once)", re.I)
+SOUNDS_VOWEL = re.compile(r"^(?:hour|honest|honor|honour|heir)", re.I)
+
+
+def article_for(word):
+    """Pick a or an for the word that a deleted adjective now exposes."""
+    if SOUNDS_VOWEL.match(word):
+        return "an"
+
+    if SOUNDS_CONSONANT.match(word):
+        return "a"
+
+    return "an" if word[:1].lower() in "aeiou" else "a"
+
+
+def match_case(word, model):
+    """Carry the removed determiner's capitalisation onto its replacement."""
+    return word.capitalize() if model[:1].isupper() else word
 
 
 def autofix(profile, text):
@@ -409,20 +429,34 @@ def autofix(profile, text):
 
     # A coordination goes first. "robust and seamless parser" must not leave a stray "and".
     for word in adjectives:
-        combo = re.compile(rf"\b{re.escape(word)}\s+and\s+(?=\w)", re.I)
+        combo = re.compile(rf"(?:\b(a|an)(\s+))?\b{re.escape(word)}\s+and\s+(?=(\w+))", re.I)
+
+        def keep_article(m):
+            if not m.group(1):
+                return ""
+
+            return match_case(article_for(m.group(3)), m.group(1)) + m.group(2)
 
         while combo.search(fixed):
-            fixed = combo.sub("", fixed, count=1)
+            fixed = combo.sub(keep_article, fixed, count=1)
             handled.append(f'removed the puffery "{word}"')
 
     # Then the lone adjective, but never when a conjunction follows it.
     for word in adjectives:
         pattern = re.compile(
-            rf"({ADJECTIVE_SLOT})({re.escape(word)})\s+(?!and\b|or\b)(?=\w)", re.I
+            rf"\b({DETERMINER})(\s+){re.escape(word)}\s+(?!and\b|or\b)(?=(\w+))", re.I
         )
 
+        def keep_determiner(m):
+            head = m.group(1)
+
+            if head.lower() in ("a", "an"):
+                head = match_case(article_for(m.group(3)), head)
+
+            return head + m.group(2)
+
         while pattern.search(fixed):
-            fixed = pattern.sub(r"\1", fixed, count=1)
+            fixed = pattern.sub(keep_determiner, fixed, count=1)
             handled.append(f'removed the puffery "{word}"')
 
     remaining = verdict(profile, fixed)["violations"]

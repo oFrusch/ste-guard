@@ -5,6 +5,33 @@ All notable changes to ste-guard appear in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-12
+
+### Added
+
+- About 150 entries in the banned phrase lists. The puffery list takes the marketing phrases:
+  empty intensifiers, vague value claims, corporate sludge, product sludge, fake specificity,
+  consultant voice, and agent bingo. The flourish list takes the transition cliches and the
+  faux-nuance hedges, so they apply where the register rules apply.
+- `load bearing`, `load-bearing`, and `idempotent` in the flourish list.
+- `say the word` and `say go` in the closer list.
+
+### Changed
+
+- The phrase lists ban a phrase, not a word that carries meaning. Words such as `scalable`,
+  `secure`, `deterministic`, and `distributed` stay legal, because the puffery rule matches on
+  a word prefix and would flag correct technical prose. Agent domain nouns such as
+  `guardrails`, `memory layer`, and `multi-agent system` stay legal for the same reason.
+- Only a single alphabetic entry reaches the `--fix` pass. Every phrase is flag-only, so the
+  fixer never deletes a phrase it cannot replace.
+
+### Fixed
+
+- `--fix` repairs the article when it deletes an adjective. "a comprehensive audit" now becomes
+  "an audit", and "an innovative parser" becomes "a parser". The repair judges the article by
+  sound, so "a robust user guide" becomes "a user guide". It touches only the article beside
+  the deleted word.
+
 ## [0.4.0] - 2026-08-08
 
 ### Added
