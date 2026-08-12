@@ -20,7 +20,7 @@ def main():
 
     profile = ste_rules.load_profile()
 
-    if profile.get("injection") == "off":
+    if ste_rules.injection_off(profile):
         return 0
 
     print(contract.render_brief(profile))

@@ -30,19 +30,48 @@ def allow():
     sys.exit(0)
 
 
-def new_text(tool, payload):
-    """Read only the text the tool adds. An Edit's old_string leaves the file, so it is moot."""
+def on_disk(path):
+    try:
+        return pathlib.Path(path).read_text()
+    except OSError:
+        return ""
+
+
+def buffers(tool, payload, path):
+    """Return the file before the call and the file after it.
+
+    A fragment alone is the wrong unit. A two-word edit falls under the word floor, and a
+    banned phrase that forms across the edit boundary never appears in the fragment.
+    """
+    before = on_disk(path)
+
     if tool == "Write":
-        return payload.get("content") or ""
+        return before, payload.get("content") or ""
 
     if tool == "Edit":
-        return payload.get("new_string") or ""
+        old = payload.get("old_string") or ""
+        new = payload.get("new_string") or ""
+
+        if old and old in before:
+            count = 0 if payload.get("replace_all") else 1
+            return before, before.replace(old, new, count) if count else before.replace(old, new)
+
+        return before, f"{before}\n{new}"
 
     if tool == "MultiEdit":
-        edits = payload.get("edits") or []
-        return "\n\n".join(e.get("new_string", "") for e in edits if isinstance(e, dict))
+        after = before
 
-    return ""
+        for edit in payload.get("edits") or []:
+            if not isinstance(edit, dict):
+                continue
+
+            old = edit.get("old_string") or ""
+            new = edit.get("new_string") or ""
+            after = after.replace(old, new, 1) if old and old in after else f"{after}\n{new}"
+
+        return before, after
+
+    return before, before
 
 
 def main():
@@ -69,16 +98,20 @@ def main():
     if pathlib.Path(path).suffix.lower() not in suffixes:
         allow()
 
-    text = new_text(tool, tool_input)
-    if not text.strip():
+    before, after = buffers(tool, tool_input, path)
+
+    if not after.strip() or after == before:
         allow()
 
     profile = ste_rules.load_profile(settings.get("profile") or "docs")
-    result = ste_rules.verdict(profile, text)
-    violations = result["violations"]
+    result = ste_rules.verdict(profile, after)
+
+    # Report what this call introduces. A defect the author never touched is not their edit.
+    stale = set(ste_rules.verdict(profile, before)["violations"]) if before.strip() else set()
+    violations = [v for v in result["violations"] if v not in stale]
 
     if os.environ.get("STE_GUARD_DEBUG"):
-        print(f"ste-guard write: {len(violations)} violations in {path}", file=sys.stderr)
+        print(f"ste-guard write: {len(violations)} new violations in {path}", file=sys.stderr)
 
     if not violations:
         ste_rules.record(profile, result, "claude-code-write", blocked=False)

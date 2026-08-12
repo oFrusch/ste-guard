@@ -20,6 +20,7 @@ STATE_DIR = pathlib.Path(
     os.environ.get("STE_GUARD_STATE_DIR") or os.path.expanduser("~/.claude/.ste-guard-state")
 )
 STATE_TTL_SECONDS = 24 * 60 * 60
+TELEMETRY_LOG = STATE_DIR / "telemetry.jsonl"
 SESSION_KEY_OK = re.compile(r"[^A-Za-z0-9._-]")
 
 
@@ -57,7 +58,8 @@ def load_profile(force=None):
     A caller passes force to pin one profile. The write guard needs the docs rules whatever
     the session runs, so the session profile must not reach it.
     """
-    base = _read_json(BUNDLED_PROFILES / "default.json") or {}
+    defaults = _read_json(BUNDLED_PROFILES / "default.json") or {}
+    base = defaults
 
     named = force or os.environ.get("STE_GUARD_PROFILE")
     cfg = None
@@ -71,18 +73,57 @@ def load_profile(force=None):
     if cfg is None:
         cfg = {}
 
-    # The parent's own list deltas must land before the child's, or a grandchild config
-    # that only sets a scalar silently discards every phrase its parent added.
-    if cfg.get("extends"):
-        parent = _read_json(BUNDLED_PROFILES / f"{cfg['extends']}.json") or {}
-        inherited = _merge_lists(base.get("lists") or {}, parent)
-        base = _deep_merge(base, parent)
+    for ancestor in _ancestors(cfg):
+        inherited = _merge_lists(base.get("lists") or {}, ancestor)
+        base = _deep_merge(base, ancestor)
         base["lists"] = inherited
 
     profile = _deep_merge(base, cfg)
     profile["lists"] = _merge_lists(base.get("lists") or {}, cfg)
 
+    return _repair(profile, defaults)
+
+
+def _repair(profile, defaults):
+    """Fall back to the bundled section when a config sets one to a value that is not a map.
+
+    A hand-edited profile that holds "budget": null used to raise on every hook invocation.
+    A style checker must never stop the agent, so a bad section reverts and the rest stands.
+    """
+    for section in ("budget", "rules", "lists", "write_guard"):
+        if not isinstance(profile.get(section), dict):
+            profile[section] = dict(defaults.get(section) or {})
+
     return profile
+
+
+def _ancestors(cfg):
+    """Walk the whole extends chain, oldest first.
+
+    Each parent's own list deltas must land before its child's. A single level was enough
+    while every profile extended default. A profile that extends a child of default needs
+    the full walk, or the grandparent's phrase additions never arrive.
+    """
+    chain, seen = [], set()
+    name = cfg.get("extends")
+
+    while name and name not in seen:
+        seen.add(name)
+        parent = _read_json(BUNDLED_PROFILES / f"{name}.json") or _read_json(name) or {}
+        chain.append(parent)
+        name = parent.get("extends")
+
+    # The walk collects child first, so reverse it. The nearest parent must win.
+    return list(reversed(chain))
+
+
+# Two spellings reached the documentation. Both must silence the injection.
+INJECTION_OFF = {"never", "off"}
+
+
+def injection_off(profile):
+    """One reading of the injection setting, so the two hooks never disagree."""
+    return profile.get("injection", "lazy") in INJECTION_OFF
 
 
 def _deep_merge(base, top):
@@ -407,6 +448,39 @@ def match_case(word, model):
     return word.capitalize() if model[:1].isupper() else word
 
 
+# Only a pure adjective is safe to delete. A word that also works as a noun or a verb
+# carries meaning in its own right. "the leverage ratio" must never become "the ratio".
+AUTOFIX_ADJECTIVES = {
+    "robust",
+    "seamless",
+    "powerful",
+    "holistic",
+    "comprehensive",
+    "sophisticated",
+    "innovative",
+    "transformative",
+    "frictionless",
+}
+
+# A closing sentence that carries an instruction is not hollow. These mark real content.
+SUBSTANCE = re.compile(r"\d|`|/|\b(?:run|set|use|check|roll|deploy|revert|call|pass|read|write)\b", re.I)
+CLOSER_TAIL_WORDS = 6
+
+
+def hollow_closer(sentence, phrase):
+    """Judge whether the whole sentence is filler, or whether it also carries content.
+
+    The fixer deletes the sentence, so a wrong call loses the author's meaning. A short
+    tail with no imperative verb, no number, and no code reads as filler.
+    """
+    rest = re.sub(re.escape(phrase), " ", sentence, flags=re.I)
+
+    if SUBSTANCE.search(rest):
+        return False
+
+    return word_count(rest) <= CLOSER_TAIL_WORDS
+
+
 def autofix(profile, text):
     """Delete the reflex failures that need no judgment. Return the text and what remains.
 
@@ -425,13 +499,21 @@ def autofix(profile, text):
 
     for phrase in _list(profile, "closers") if _on(profile, "closers") else []:
         pattern = re.compile(rf"(?:^|(?<=[.!?\n]))[^.!?\n]*{re.escape(phrase)}[^.!?\n]*[.!?]?\s*$", re.I)
+        match = pattern.search(fixed)
 
-        if pattern.search(fixed):
+        if match and hollow_closer(match.group(0), phrase):
             fixed = pattern.sub("", fixed, count=1).rstrip() + "\n"
             handled.append(f'removed the closing sentence with "{phrase}"')
 
-    # Only alphabetic entries are safe. A stem such as "game-chang" has no clean boundary.
-    adjectives = [w for w in (_list(profile, "puffery") if _on(profile, "puffery") else []) if w.isalpha()]
+    # A profile extends the safe set when its own list holds a pure adjective we do not know.
+    safe = AUTOFIX_ADJECTIVES | {w.lower() for w in profile.get("autofix_adjectives") or []}
+
+    # Only a known adjective is safe. A stem such as "game-chang" has no clean boundary, and
+    # a word such as "leverage" is a noun the author may have meant.
+    adjectives = [
+        w for w in (_list(profile, "puffery") if _on(profile, "puffery") else [])
+        if w.isalpha() and w.lower() in safe
+    ]
 
     # A coordination goes first. "robust and seamless parser" must not leave a stray "and".
     for word in adjectives:
@@ -500,7 +582,7 @@ def record(profile, result, agent, blocked):
 
     try:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
-        with open(STATE_DIR / "telemetry.jsonl", "a") as handle:
+        with open(TELEMETRY_LOG, "a") as handle:
             handle.write(json.dumps(line) + "\n")
     except OSError:
         pass
@@ -565,12 +647,20 @@ def save_state(session, record):
 
 
 def prune_stale():
+    """Drop the block counter for a session that ended. The pruner reads session files only.
+
+    The telemetry log lives in the same directory and holds the whole history. A user who
+    stops for a day used to lose it, because the pruner judged it by its age alone.
+    """
     import time
 
     cutoff = time.time() - STATE_TTL_SECONDS
 
     try:
         for entry in STATE_DIR.iterdir():
+            if entry.name == TELEMETRY_LOG.name or entry.suffix != ".json":
+                continue
+
             if entry.stat().st_mtime < cutoff:
                 entry.unlink()
     except OSError:

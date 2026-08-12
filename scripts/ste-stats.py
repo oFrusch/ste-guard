@@ -48,7 +48,7 @@ def read(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--log", default=str(ste_rules.STATE_DIR / "telemetry.jsonl"))
+    parser.add_argument("--log", default=str(ste_rules.TELEMETRY_LOG))
     args = parser.parse_args()
 
     rows = read(args.log)

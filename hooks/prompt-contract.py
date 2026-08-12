@@ -23,7 +23,7 @@ def main():
     profile = ste_rules.load_profile()
     mode = profile.get("injection", "lazy")
 
-    if mode == "off":
+    if ste_rules.injection_off(profile):
         return 0
 
     if mode == "lazy":

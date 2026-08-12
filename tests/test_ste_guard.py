@@ -11,7 +11,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 HOOKS = ROOT / "hooks"
@@ -1369,6 +1371,85 @@ class SetupScript(unittest.TestCase):
         )
 
         self.assertEqual(result.stdout.strip(), "130 False", result.stderr)
+
+
+class AuditRegressions(unittest.TestCase):
+    """One test per defect the audit reported. Each one failed before the fix."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="ste-guard-test-")
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def profile_file(self, cfg):
+        path = pathlib.Path(self.dir) / "p.json"
+        path.write_text(json.dumps(cfg))
+
+        return profile(str(path))
+
+    def test_injection_never_silences_the_hooks(self):
+        for value in ("never", "off"):
+            self.assertTrue(ste_rules.injection_off({"injection": value}), value)
+
+        self.assertFalse(ste_rules.injection_off({"injection": "lazy"}))
+
+    def test_a_grandparent_keeps_its_list_additions(self):
+        p = self.profile_file({"extends": "docs", "injection": "lazy"})
+
+        self.assertIn("the explorer found", p["lists"]["narration"])
+        self.assertIn("a clean insertion", p["lists"]["flourish"])
+        self.assertIn("robust", p["lists"]["puffery"])
+
+    def test_a_cyclic_extends_chain_terminates(self):
+        p = self.profile_file({"extends": "p", "budget": {"words": 99}})
+
+        self.assertEqual(p["budget"]["words"], 99)
+
+    def test_a_malformed_section_falls_back_instead_of_raising(self):
+        p = self.profile_file({"extends": "default", "budget": None, "rules": None})
+
+        self.assertEqual(p["budget"]["words"], 250)
+        self.assertTrue(p["rules"]["puffery"])
+        self.assertFalse(ste_rules.verdict(p, "The parser rejects it. " * 12)["violations"])
+
+    def test_the_fixer_keeps_a_noun_that_also_reads_as_puffery(self):
+        p = profile("default")
+        fixed, _, _ = ste_rules.autofix(p, "The bank reports the leverage ratio to the regulator.")
+
+        self.assertIn("leverage ratio", fixed)
+
+    def test_the_fixer_keeps_a_closing_sentence_that_carries_an_instruction(self):
+        p = profile("default")
+        text = "Deploy it. Let me know if the row count drops below one hundred, then roll back."
+        fixed, _, _ = ste_rules.autofix(p, text)
+
+        self.assertIn("roll back", fixed)
+
+    def test_the_fixer_still_removes_a_truly_hollow_closer(self):
+        p = profile("default")
+        fixed, _, _ = ste_rules.autofix(p, "The parser rejects it. Let me know if you need more.")
+
+        self.assertEqual(fixed.strip(), "The parser rejects it.")
+
+    def test_the_pruner_keeps_the_telemetry_log(self):
+        state = pathlib.Path(self.dir) / "state"
+        state.mkdir()
+        old = time.time() - (ste_rules.STATE_TTL_SECONDS * 2)
+
+        log = state / "telemetry.jsonl"
+        session = state / "s1.json"
+
+        for target in (log, session):
+            target.write_text("{}\n")
+            os.utime(target, (old, old))
+
+        with mock.patch.object(ste_rules, "STATE_DIR", state), \
+                mock.patch.object(ste_rules, "TELEMETRY_LOG", log):
+            ste_rules.prune_stale()
+
+        self.assertTrue(log.exists())
+        self.assertFalse(session.exists())
 
 
 if __name__ == "__main__":

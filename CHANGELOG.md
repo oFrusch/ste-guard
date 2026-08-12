@@ -5,6 +5,41 @@ All notable changes to ste-guard appear in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-08-12
+
+An audit reported these. Each one has a regression test that failed before the fix.
+
+### Fixed
+
+- `injection` accepts `never`. The setup script and the README both wrote `never`, and both
+  hooks matched `off` alone. The setting silently did nothing. `off` stays as an alias.
+- `extends` resolves the whole chain. A profile that extended `docs` lost every phrase entry
+  `peer-eng` added, because the loader walked one parent only. A cycle now terminates.
+- `--fix` never deletes a word that also reads as a noun or a verb.
+  It shortened "the leverage ratio" to "the ratio". Only a known adjective goes now, and
+  `autofix_adjectives` extends that set.
+- `--fix` keeps a closing sentence that carries content. It deleted a rollback instruction,
+  because the sentence also held "let me know if". A number, a path, or an imperative verb
+  now marks the sentence as substantive.
+- A malformed profile section reports nothing instead of raising. A profile with
+  `"budget": null` used to raise an AttributeError on every hook invocation.
+- `prune_stale` keeps `telemetry.jsonl`. The pruner judged the log by its age, so a user who
+  paused for a day lost the whole history.
+- The write guard reads the reconstructed file, not the fragment. A small edit fell under the
+  word floor, and a banned phrase formed across an edit boundary never appeared in the
+  fragment. The guard now reports only the violations the call introduces, so a defect
+  already on disk never blocks an unrelated edit.
+- The pi extension holds its state per registration. `chain` and `lastAssistantText` were
+  module globals, so a second registration inherited the first one's counter.
+- The pi extension keeps the chain counter when it gives up. It reset the counter at the cap,
+  so the next reply started a fresh chain and the cap never held.
+- The pi extension reports a checker failure. Every exec error and JSON error died in
+  silence, so a missing `python3` disabled enforcement with no signal.
+
+### Changed
+
+- The Codex install notes say four hooks. The installer has written four since 0.6.0.
+
 ## [0.6.0] - 2026-08-12
 
 ### Added

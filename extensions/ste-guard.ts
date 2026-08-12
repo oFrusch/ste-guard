@@ -28,12 +28,6 @@ interface Verdict {
   max_blocks_per_chain: number;
 }
 
-/** Consecutive rewrites asked for. A reply that passes resets it. */
-let chain = 0;
-
-/** The last assistant text seen, because agent_end does not carry the message. */
-let lastAssistantText = "";
-
 function textOf(message: any): string {
   const content = message?.content;
 
@@ -68,6 +62,12 @@ function buildPrompt(violations: string[]): string {
 }
 
 export default function (pi: ExtensionAPI) {
+  /** Consecutive rewrites asked for. A reply that passes resets it. Per registration. */
+  let chain = 0;
+
+  /** The last assistant text seen, because agent_end does not carry the message. */
+  let lastAssistantText = "";
+
   pi.on("message_end", (event: any) => {
     if (event?.message?.role !== "assistant") {
       return;
@@ -100,7 +100,11 @@ export default function (pi: ExtensionAPI) {
       const result = await pi.exec("python3", [CHECKER, "--json", draftPath], { timeout: 10_000 });
 
       parsed = JSON.parse(result.stdout);
-    } catch {
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error);
+
+      ctx?.ui?.notify?.(`ste-guard: the checker failed, so no rule ran. ${reason}`, "error");
+
       return;
     } finally {
       rmSync(scratch, { recursive: true, force: true });
@@ -113,7 +117,11 @@ export default function (pi: ExtensionAPI) {
 
     // The cap stops a stubborn reply from looping. Only a clean reply clears it.
     if (chain >= parsed.max_blocks_per_chain) {
-      chain = 0;
+      ctx?.ui?.notify?.(
+        `ste-guard: chain cap of ${parsed.max_blocks_per_chain} reached, ${parsed.violations.length} violations left.`,
+        "warn",
+      );
+
       return;
     }
 

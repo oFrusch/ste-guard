@@ -142,3 +142,46 @@ test("an empty reply is skipped", async () => {
 
   assert.equal(sent.length, 0);
 });
+
+test("a second registration starts with its own chain", async () => {
+  const first = fakePi();
+  register(first.pi as any);
+
+  await runTurn(first.handlers, DIRTY);
+  await runTurn(first.handlers, `${DIRTY} Again.`);
+
+  const second = fakePi();
+  register(second.pi as any);
+
+  await runTurn(second.handlers, DIRTY);
+
+  assert.equal(first.sent.length, 2);
+  assert.equal(second.sent.length, 1);
+});
+
+test("the cap holds until a clean reply clears it", async () => {
+  const { pi, handlers, sent } = fakePi();
+  register(pi as any);
+
+  for (let i = 0; i < 6; i++) {
+    await runTurn(handlers, `${DIRTY} Variant ${i}.`);
+  }
+
+  assert.equal(sent.length, 2);
+});
+
+test("a checker failure notifies rather than passing in silence", async () => {
+  const { pi, handlers, sent } = fakePi();
+  const notes: string[] = [];
+
+  pi.exec = async () => {
+    throw new Error("python3 not found");
+  };
+
+  register(pi as any);
+  handlers.message_end(assistantMessage(DIRTY));
+  await handlers.agent_end({}, { ui: { notify: (text: string) => notes.push(text) } });
+
+  assert.equal(sent.length, 0);
+  assert.ok(notes.some((n) => n.includes("the checker failed")));
+});

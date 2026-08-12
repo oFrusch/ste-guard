@@ -53,12 +53,12 @@ python3 ~/.codex/plugins/cache/ste-guard/ste-guard/<version>/scripts/codex-insta
 ```
 
 The third step exists because Codex v0.147 installs a plugin's skills but does not load the
-hooks the plugin ships. The script writes the three hook entries into `~/.codex/hooks.json`
+hooks the plugin ships. The script writes the four hook entries into `~/.codex/hooks.json`
 by absolute path. It backs the file up first, it leaves your other hooks alone, and it never
 stacks duplicates. Run it again after a plugin update, because the version sits in the path.
 
 Codex asks you to trust each new hook command on the next interactive run. Until you approve
-them, Codex skips the hooks without a warning. Run `codex` once and accept the three prompts.
+them, Codex skips the hooks without a warning. Run `codex` once and accept the four prompts.
 
 Remove the entries with `--uninstall`.
 
@@ -129,7 +129,7 @@ override only the keys you want.
 | Key | Type | Meaning |
 | :-- | :-- | :-- |
 | `extends` | string | A bundled profile name to inherit from |
-| `injection` | string | `lazy`, `always`, or `off` |
+| `injection` | string | `lazy`, `always`, or `never`. `off` is an alias for `never` |
 | `min_words_to_lint` | number | Replies shorter than this are never checked |
 | `soft_block_threshold` | number | Soft violations needed to block on their own |
 | `max_blocks_per_message` | number | Blocks allowed against one message digest |
@@ -141,6 +141,11 @@ override only the keys you want.
 | `lists.*` | array | Replaces a phrase list |
 | `lists_add.*` | array | Appends to a phrase list |
 | `lists_remove.*` | array | Removes entries from a phrase list |
+| `autofix_adjectives` | array | Extra words the `--fix` pass may delete before a noun |
+| `write_guard.enabled` | boolean | The write guard switch |
+| `write_guard.mode` | string | `deny` blocks the write. `warn` reports and lets it land |
+| `write_guard.profile` | string | The profile the write guard lints with |
+| `write_guard.suffixes` | array | The file types the write guard reads |
 
 ### Rule switches
 
@@ -192,6 +197,14 @@ The fixer is deliberately timid. It leaves a predicate use such as "the parser i
 alone, because a deletion there breaks the sentence. It leaves a hyphenated entry alone,
 because the phrase list holds stems.
 
+Two rules keep the fixer from deleting meaning:
+
+- It deletes a known adjective only. A word that also reads as a noun or a verb stays, so
+  "the leverage ratio" never becomes "the ratio". Name your own safe words with
+  `autofix_adjectives` in a profile.
+- It deletes a closing sentence only when the rest of that sentence is filler. A sentence
+  that also carries a number, a path, or an imperative verb stays whole.
+
 ## Measure the rules
 
 Telemetry is off by default. Turn it on with `"telemetry": true` in your profile, or with
@@ -233,6 +246,8 @@ Inline code, fenced code, block quotes, links, and file paths are also exempt.
   until you add the phrase to a list.
 - The write guard reads `.md`, `.markdown`, and `.mdx` only. A comment in a source file, a
   commit message, and a PR body all pass with no check.
+- The write guard reconstructs the file the tool is about to write, then reports only the
+  violations that call introduces. A defect already on disk never blocks an unrelated edit.
 - The write guard reads the tool names `Write`, `Edit`, and `MultiEdit`. Another agent that
   edits a file under a different tool name gets through.
 
